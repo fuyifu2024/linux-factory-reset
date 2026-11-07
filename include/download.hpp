@@ -15,7 +15,7 @@ struct OfficialImage {
     std::string distro, release, edition, arch, filename, url, checksum;
     uint64_t size = 0;
     std::string format = "iso", checksum_algorithm = "sha256";
-    bool automatic_restore = false;
+    bool automatic_restore = false, signature_verified = false;
     json describe() const;
 };
 // Only authenticated HTTPS transport is accepted. Checksum is required for image publication.

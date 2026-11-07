@@ -53,7 +53,9 @@ sudo linux-factory-reset plan
 
 An imported image must contain a pristine installed system of the same distribution, CPU architecture and boot layout, with exactly one ext4 system partition and one FAT boot partition, and no existing personal accounts. Installer/live ISOs, incremental QCOW2 and encrypted disks are not installed-system references. Local files are snapshotted privately and parsed read-only; a computed file hash does not authenticate its publisher.
 
-Automatic recovery-source preparation appears only on supported detected hardware. Currently it is built in for the Ubuntu 26.04 native Pi boot adapter and checks signed checksums. Generic Debian/Ubuntu UEFI devices still require local installed-system images or administrator-prepared profiles. **Downloading an official ISO is separate from preparing a usable recovery source.**
+Automatic preparation appears only when a built-in source matches the detected system. The development branch integrates official Debian 13 NoCloud images for generic AMD64/ARM64 UEFI, using official HTTPS SHA-512 checksums, plus signed Ubuntu 26.04 native Pi images. Downloads run with visible progress/speed/cancellation as the ordinary desktop user; the privileged importer checks the snapshot against the expected digest again.
+
+**The Debian automatic source is a base system without a desktop, with a new administrator created at the local console. It is not a historical copy of the original desktop package set or configuration.** Generic Ubuntu UEFI and Debian 12 still need local installed-system images or administrator-produced profiles. Consult the acceptance record for the release tag being used. **Downloading an official ISO is separate from preparing a usable recovery source.**
 
 Previewing changes requires prepared recovery data. Missing state now gives setup guidance; actual backend errors are displayed and can be copied. Preparation/comparison shows a busy dialog.
 

@@ -100,7 +100,7 @@ std::string TransferProgress::text() const {
 json OfficialImage::describe() const {
     return {{"distro", distro}, {"release", release}, {"edition", edition}, {"arch", arch}, {"filename", filename}, {"url", url},
         {checksum_algorithm, checksum}, {"size", size}, {"trust", "Checksum from official HTTPS metadata; detached PGP signature not checked by ISO downloader"},
-        {"format", format}, {"automatic_restore", automatic_restore}};
+        {"format", format}, {"automatic_restore", automatic_restore}, {"signature_verified", signature_verified}};
 }
 std::string fetch_metadata(const std::string& url, const std::string& proxy) {
     Transfer t; t.limit = 4ULL << 20; request(url, t, proxy); return t.metadata;
@@ -199,7 +199,7 @@ OfficialImage resolve_recovery(const std::string& distro, const std::string& ver
     write(temporary.path / "sums", sums); write(temporary.path / "signature", signature);
     run({"gpgv", "--homedir", temporary.path.string(), "--keyring", "/usr/share/keyrings/ubuntu-archive-keyring.gpg", (temporary.path / "signature").string(), (temporary.path / "sums").string()});
     OfficialImage image{"ubuntu", "26.04.1", "preinstalled desktop", "arm64", filename, base + filename, signed_checksum(sums, filename), 0};
-    image.format = "img.xz"; image.automatic_restore = true; validate(image); return image;
+    image.format = "img.xz"; image.automatic_restore = true; image.signature_verified = true; validate(image); return image;
 }
 
 std::string host_arch() { struct utsname u{}; need(uname(&u) == 0, "uname failed"); return std::string(u.machine) == "aarch64" ? "arm64" : std::string(u.machine) == "x86_64" ? "amd64" : "unsupported"; }

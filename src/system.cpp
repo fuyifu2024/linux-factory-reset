@@ -304,6 +304,9 @@ void prepare_image(const fs::path& selected, const fs::path& location, const std
     need(expected_sha512.empty() || sha512(snapshot) == expected_sha512, "Official image changed before import (SHA-512 mismatch)");
     json provenance{{"type", "local image"}, {"filename", selected.filename().string()}, {"sha256", sha256(snapshot)}, {"format", format},
                     {"authentication", "User-selected local file; computed hash is integrity tracking, not proof of publisher identity"}};
+    if (!expected_sha256.empty()) provenance["expected_sha256"] = expected_sha256;
+    if (!expected_sha512.empty()) provenance["expected_sha512"] = expected_sha512;
+    if (!expected_sha256.empty() || !expected_sha512.empty()) provenance["snapshot_checksum_verified"] = true;
     if (format == "profile") {
         check_profile(snapshot, st); register_profile(snapshot, st, provenance); return;
     }
