@@ -51,4 +51,10 @@ result=$?
 set -e
 cat "$evidence/profile-validation.txt"
 printf '\nExit: %s\nNo reset was armed or executed.\n' "$result" >>"$evidence/profile-validation.txt"
+if [ "$result" -eq 0 ] && [ -n "${4:-}" ]; then
+    umount "$work/root"
+    umount "$work/boot"
+    losetup --detach "$loop"; loop=''
+    sh tests/real-boot.sh "$work/disk.raw" "$4" "$evidence"
+fi
 exit "$result"

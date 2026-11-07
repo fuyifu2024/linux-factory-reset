@@ -6,15 +6,25 @@ permissions:
 jobs:
   reference:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - name: Dependencies (disposable remote runner)
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev libcurl4-openssl-dev nlohmann-json3-dev qemu-utils rsync squashfs-tools
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libcurl4-openssl-dev nlohmann-json3-dev qemu-utils qemu-system-x86 ovmf gdisk parted nodejs rsync squashfs-tools
       - name: Build
         run: cmake -S . -B build -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr && cmake --build build -j2
-      - name: Download, inspect and validate a real Debian source without booting or arming
-        run: sudo sh tests/real-image.sh "$PWD/build/linux-factory-reset" "$PWD/evidence" "$PWD/firstboot"
+      - name: Build native Debian VM package from the same source
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src debian:trixie-slim sh -ec '
+            apt-get update
+            apt-get install -y --no-install-recommends ca-certificates build-essential cmake file libssl-dev libcurl4-openssl-dev nlohmann-json3-dev
+            cmake -S . -B build-vm -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+            cmake --build build-vm -j2
+            cd build-vm
+            cpack -G DEB
+          '
+      - name: Validate a real source, then actually restore an expendable UEFI VM
+        run: sudo env GITHUB_ACTIONS=true sh tests/real-image.sh "$PWD/build/linux-factory-reset" "$PWD/evidence" "$PWD/firstboot" "$PWD"/build-vm/*.deb
       - uses: actions/upload-artifact@v4
         if: always()
         with:
