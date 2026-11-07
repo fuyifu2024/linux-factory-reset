@@ -21,7 +21,7 @@ jobs:
       DEBIAN_FRONTEND: noninteractive
     steps:
       - name: Install build and fixture-test dependencies
-        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates git build-essential cmake libssl-dev nlohmann-json3-dev rsync squashfs-tools shellcheck
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates git build-essential cmake file libssl-dev nlohmann-json3-dev rsync squashfs-tools shellcheck
       - uses: actions/checkout@v4
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr

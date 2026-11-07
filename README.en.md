@@ -70,7 +70,7 @@ The GUI's final confirmation uses `arm --confirm ERASE-ALL-USERS --reboot`. Keep
 ## Build and tests
 
 ```sh
-sudo apt install build-essential cmake libssl-dev nlohmann-json3-dev \
+sudo apt install build-essential cmake file libssl-dev nlohmann-json3-dev \
   rsync squashfs-tools curl gpgv xz-utils util-linux findutils udev \
   initramfs-tools zenity pkexec
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr

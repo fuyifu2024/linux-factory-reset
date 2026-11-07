@@ -72,7 +72,7 @@ GUI 最终确认后使用 `arm --confirm ERASE-ALL-USERS --reboot`。恢复介�
 Debian 12、13 和 Ubuntu 可使用：
 
 ```sh
-sudo apt install build-essential cmake libssl-dev nlohmann-json3-dev \
+sudo apt install build-essential cmake file libssl-dev nlohmann-json3-dev \
   rsync squashfs-tools curl gpgv xz-utils util-linux findutils udev \
   initramfs-tools zenity pkexec
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
