@@ -1,4 +1,13 @@
 #!/bin/sh
+uf_device() {
+    uf_devices=$(blkid -t "UUID=$1" -o device 2>/dev/null) || return 1
+    case "$uf_devices" in
+        ''|*'
+'*) return 1 ;;
+        /dev/*) printf '%s\n' "$uf_devices" ;;
+        *) return 1 ;;
+    esac
+}
 # Offline boot-pointer relocation, shared with directory-fixture tests.
 uf_inside() {
     uf_base=$(readlink -f "$1") || return 1

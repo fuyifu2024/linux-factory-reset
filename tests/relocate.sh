@@ -2,6 +2,19 @@
 set -eu
 # shellcheck source=boot/relocate.sh
 . "$1"
+blkid() { printf '%s\n' "$device_reply"; return "$device_status"; }
+device_status=0
+device_reply=/dev/vda1
+[ "$(uf_device root-1111)" = /dev/vda1 ]
+device_reply=''
+if uf_device root-1111; then exit 1; fi
+device_reply='/dev/vda1
+/dev/vdb1'
+if uf_device root-1111; then exit 1; fi
+device_reply=/dev/vda1
+device_status=2
+if uf_device root-1111; then exit 1; fi
+unset -f blkid
 fixture=$(mktemp -d)
 trap 'rm -rf "$fixture"' EXIT HUP INT TERM
 for distro in ubuntu debian; do

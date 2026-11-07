@@ -7,12 +7,10 @@ mkdir -p "$DESTDIR/conf" "$DESTDIR/usr/lib/ubuntu-reset"
 copy_file config /etc/ubuntu-reset/boot.conf /conf/ubuntu-reset.conf
 copy_file script /usr/lib/ubuntu-reset/reconcile.sh /usr/lib/ubuntu-reset/reconcile.sh
 copy_file script /usr/lib/ubuntu-reset/relocate.sh /usr/lib/ubuntu-reset/relocate.sh
-copy_exec /usr/bin/rsync /usr/bin/rsync
-copy_exec /usr/bin/sha256sum /usr/bin/sha256sum
-copy_exec /usr/bin/du /usr/bin/du
-copy_exec /usr/bin/df /usr/bin/df
-copy_exec /usr/bin/stat /usr/bin/stat
-copy_exec /usr/bin/find /usr/bin/find
+# Do not rely on the distro-specific BusyBox applet whitelist.
+for tool in rsync sha256sum du df stat find cat readlink grep sed awk mkdir rm sync sleep; do
+    copy_exec "/usr/bin/$tool" "/usr/bin/$tool"
+done
 copy_exec /usr/sbin/blkid /usr/sbin/blkid
 for module in ext4 squashfs loop vfat nls_utf8 nls_cp437 usb_storage uas xhci_pci; do
     manual_add_modules "$module"

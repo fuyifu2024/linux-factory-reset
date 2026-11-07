@@ -443,6 +443,8 @@ void arm(const json& s, const std::string& confirmation, bool reboot) {
     auto initrd = fs::path("/boot") / ("initrd.img-" + k); auto contents = output({"lsinitramfs", str(initrd)});
     need(contents.find("scripts/local-bottom/ubuntu-reset") != std::string::npos && contents.find("conf/ubuntu-reset.conf") != std::string::npos
          && contents.find("usr/lib/ubuntu-reset/relocate.sh") != std::string::npos, "Recovery files are absent from initramfs");
+    for (const auto& tool : {"awk", "grep", "sed", "rsync", "sha256sum", "readlink", "sync"})
+        need(contents.find(std::string("usr/bin/") + tool) != std::string::npos, "Recovery utility missing from initramfs: " + std::string(tool));
     if (s["platform"] == "raspi-arm64") {
         auto config = read("/boot/firmware/config.txt");
         need(stock_pi_boot(config), "Unsupported/ambiguous Pi boot recipe");

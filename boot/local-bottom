@@ -34,11 +34,6 @@ done
 [ "$(stat -c '%u:%a' "$UF_REQUEST")" = '0:600' ] || uf_fail 'Unsafe reset request permissions'
 [ "$(cat "$UF_REQUEST")" = "$UF_ID" ] || uf_fail 'Request does not match the recovery initramfs'
 
-uf_device() {
-    uf_devices=$(blkid -t "UUID=$1" -o device 2>/dev/null) || return 1
-    [ "$(printf '%s\n' "$uf_devices" | wc -l)" -eq 1 ] || return 1
-    printf '%s\n' "$uf_devices"
-}
 UF_ROOT_DEV=$(uf_device "$UF_ROOT") || uf_fail 'Ambiguous/missing target root UUID'
 UF_BOOT_DEV=$(uf_device "$UF_BOOT") || uf_fail 'Ambiguous/missing boot UUID'
 if [ "$UF_ROOT" = "$UF_BOOT" ] || [ "$UF_ROOT" = "$UF_STORE" ] || [ "$UF_BOOT" = "$UF_STORE" ]; then
