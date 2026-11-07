@@ -186,7 +186,7 @@ OfficialImage resolve_recovery(const std::string& distro, const std::string& ver
         std::string base = "https://cloud.debian.org/images/cloud/trixie/latest/";
         auto filename = "debian-13-nocloud-" + std::string(arch) + ".qcow2";
         auto text = fetch_metadata(base + "SHA512SUMS", proxy); std::istringstream lines(text); std::string line, checksum;
-        while (std::getline(lines, line)) if (line.size() >= 131 && line.substr(130) == filename) {
+        while (std::getline(lines, line)) if (line.size() >= 131 && line[128] == ' ' && (line[129] == ' ' || line[129] == '*') && line.substr(130) == filename) {
             need(checksum.empty(), "Ambiguous Debian recovery checksum"); checksum = line.substr(0,128);
         }
         OfficialImage image{"debian", "13", "nocloud base system (no desktop)", arch, filename, base + filename, checksum, 0};

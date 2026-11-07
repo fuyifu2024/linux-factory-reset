@@ -26,6 +26,12 @@ jobs:
           build/linux-factory-reset resolve --distro debian --release stable --edition netinst --arch arm64 > evidence/debian-arm64.json
           sleep 6
           build/linux-factory-reset resolve --distro debian --release stable --edition netinst --arch amd64 > evidence/debian-amd64.json
+          sleep 6
+          build/linux-factory-reset resolve-recovery --distro debian --version 13 --platform arm64-uefi > evidence/debian-recovery-arm64.json
+          sleep 6
+          build/linux-factory-reset resolve-recovery --distro debian --version 13 --platform x86_64-uefi > evidence/debian-recovery-amd64.json
+          sleep 6
+          build/linux-factory-reset resolve-recovery --distro ubuntu --version 26.04 --platform raspi-arm64 > evidence/ubuntu-recovery-native.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

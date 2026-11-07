@@ -39,6 +39,7 @@ int main(int argc, char** argv) {
         std::map<std::string, std::set<std::string>> allowed{
             {"gui", {"--preview"}}, {"status", {}}, {"sources", {}}, {"firmware-status", {}}, {"plan", {}}, {"cancel", {}},
             {"catalog", {}}, {"resolve", {"--distro", "--release", "--edition", "--arch", "--proxy"}},
+            {"resolve-recovery", {"--distro", "--version", "--platform", "--proxy"}},
             {"download", {"--distro", "--release", "--edition", "--arch", "--directory", "--proxy"}},
             {"prepare-image", {"--file", "--storage", "--sha256", "--sha512"}}, {"prepare-auto", {"--storage", "--proxy"}},
             {"prepare-pi", {"--release", "--storage", "--proxy"}}, {"prepare-profile", {"--url", "--sha256", "--storage", "--proxy"}},
@@ -60,6 +61,10 @@ int main(int argc, char** argv) {
             return 0;
         }
         if (cmd == "catalog") { std::cout << uf::download_catalog().dump(2) << '\n'; return 0; }
+        if (cmd == "resolve-recovery") {
+            auto proxy = options.contains("--proxy") ? get("--proxy") : "";
+            std::cout << uf::resolve_recovery(get("--distro"), get("--version"), get("--platform"), proxy).describe().dump(2) << '\n'; return 0;
+        }
         if (cmd == "resolve" || cmd == "download") {
             auto proxy = options.contains("--proxy") ? get("--proxy") : "";
             auto image = uf::resolve_image(get("--distro"), get("--release"), get("--edition"), get("--arch"), proxy);
