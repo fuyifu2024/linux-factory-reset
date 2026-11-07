@@ -11,6 +11,9 @@ UF_TARGET=${rootmnt:-/root}
 
 uf_fail() {
     echo "Ubuntu Reset STOPPED: $*" >/dev/console
+    # Honor a console-disabled panic policy, but force halt rather than a
+    # timed reboot that could otherwise repeatedly retry a destructive action.
+    if [ -n "${panic:-}" ]; then panic=0; else panic=''; fi
     # panic() can return after the rescue shell exits. Never fall through into
     # booting a partly restored OS, and never reboot in a retry loop.
     while :; do

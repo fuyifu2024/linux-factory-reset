@@ -26,7 +26,16 @@ jobs:
         run: shellcheck -e SC1091 boot/hook boot/local-bottom boot/reconcile.sh firstboot/firstboot.sh tests/reconcile.sh
       - name: Package
         run: cd build && cpack -G DEB
+      - name: Collect binary and package
+        run: |
+          TASK_ARCH=$(dpkg --print-architecture)
+          mkdir -p build/release
+          cp build/*.deb build/release/
+          cp build/ubuntu-reset "build/release/ubuntu-reset-linux-$TASK_ARCH"
+          strip "build/release/ubuntu-reset-linux-$TASK_ARCH"
+          cd build/release
+          sha256sum *.deb ubuntu-reset-linux-* > "SHA256SUMS-$TASK_ARCH"
       - uses: actions/upload-artifact@v4
         with:
           name: ubuntu-reset-${{ matrix.runner }}
-          path: build/*.deb
+          path: build/release/*

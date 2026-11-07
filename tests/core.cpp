@@ -20,7 +20,7 @@ int main() {
         write(tmp.path / "hash", "abc");
         check(sha256(tmp.path / "hash") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "SHA256 known vector");
         check(random_id().size() == 32 && random_id() != random_id(), "random identifiers");
-        check(valid_uuid("e0052186-ed2e-4135-bffe-dd6277a39d8b") && valid_uuid("75A7-9F0D"), "UUID formats");
+        check(valid_uuid("01234567-89ab-cdef-0123-456789abcdef") && valid_uuid("ABCD-1234"), "UUID formats");
         check(!valid_uuid("a';reboot #") && !valid_uuid("../../dev/sda"), "UUID injection rejected");
         auto s = state(); validate_state(s); check(boot_config(s).find("UF_ROOT='1111-2222'") != std::string::npos, "boot config");
         auto bad = s; bad["file"] = "../../etc/shadow"; rejects([&] {validate_state(bad);}, "profile path traversal");

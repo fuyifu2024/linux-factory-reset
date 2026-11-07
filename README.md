@@ -32,6 +32,8 @@ LUKS、LVM、RAID、Btrfs、独立 `/home`、独立 `/boot`、双系统恢复和
 
 从 [Releases](https://github.com/fuyifu2024/ubuntu-reset/releases) 下载匹配架构的 `.deb`，使用 `sudo apt install ./文件名.deb` 安装。安装包只安装程序和休眠的 hook，**不会自动准备资料、生成 initramfs、设置恢复标记或重启**。
 
+Releases 同时提供 `ubuntu-reset-linux-arm64` / `ubuntu-reset-linux-amd64` 原生可执行文件和 SHA-256；它们动态链接系统运行库，完整恢复功能建议通过 DEB 安装所需脚本。源码就在本仓库，发行页也可下载源码归档。
+
 源码构建：
 
 ```sh
@@ -90,6 +92,8 @@ sudo ubuntu-reset reset-firmware --confirm RESET-BIOS-DEFAULTS
 ## 验证与故障处理
 
 测试覆盖哈希、下载地址、签名清单解析、路径/UUID 注入拦截、恢复源个人账户拦截、原始资料生成、账户/数据删除、默认文件修复、保留相同文件、恶意目录链接和失败返回。所有恢复集成测试只操作临时目录。
+
+已执行与尚未执行的验证逐项记录在 [验证记录](docs/validation.md)。
 
 校验失败、下载失败或准备失败不会设置恢复标记。离线恢复开始后发生错误，会停留在 initramfs 救援环境，不启动恢复到一半的系统。恢复不是跨文件系统事务；断电可能损坏系统/启动分区，尤其启动文件替换期间，需要独立救援介质。具体人工恢复方法见 [恢复设计和故障边界](docs/recovery.md)。
 
