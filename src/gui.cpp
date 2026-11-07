@@ -119,6 +119,8 @@ int gui(bool preview) {
     need(geteuid() != 0, "请以普通桌面用户打开界面，需要管理员权限时会单独验证");
     // Dialogs are 2D: avoid fragile VM EGL/Zink acceleration by default.
     // This affects this process/children only and preserves an explicit user override.
+    // Zenity converts argv using the locale charset; minimal containers often default to ASCII.
+    setenv("LC_ALL", "C.UTF-8", 1);
     signal(SIGPIPE, SIG_IGN); // A closed progress window cancels the transfer instead of terminating us.
     setenv("GSK_RENDERER", "cairo", 0);
     setenv("LIBGL_ALWAYS_SOFTWARE", "1", 0);

@@ -49,11 +49,11 @@ jobs:
           apt-get install -y --no-install-recommends xvfb xauth
           useradd --create-home gui-smoke
           set +e
-          runuser -u gui-smoke -- env -u GSK_RENDERER -u LIBGL_ALWAYS_SOFTWARE xvfb-run -a timeout --kill-after=2 5 linux-factory-reset gui > /tmp/gui-smoke.log 2>&1
+          runuser -u gui-smoke -- env -u GSK_RENDERER -u LIBGL_ALWAYS_SOFTWARE LC_ALL=C xvfb-run -a timeout --kill-after=2 5 linux-factory-reset gui > /tmp/gui-smoke.log 2>&1
           TASK_STATUS=$?
           set -e
           cat /tmp/gui-smoke.log
-          test "$TASK_STATUS" -eq 124
+          if [ "$TASK_STATUS" -ne 124 ]; then zenity --help-all; exit 1; fi
           if grep -E 'MESA: error|ZINK:|libEGL warning|failed to create dri2' /tmp/gui-smoke.log; then exit 1; fi
       - name: Drive missing-state GUI flow without privileged actions
         run: sh tests/gui-flow.sh /usr/bin/linux-factory-reset

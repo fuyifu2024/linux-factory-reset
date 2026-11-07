@@ -212,7 +212,7 @@ fs::path recovery_mount(const fs::path& selected, const json& filesystem, const 
     need(filesystem.at("uuid") != target.at("root").at("uuid") && filesystem.at("uuid") != target.at("boot").at("uuid"),
          "你选择的是当前系统盘或启动盘中的文件夹。恢复资料需要存放在另一块恢复磁盘上；普通系统文件夹不能代替它。虚拟机请先添加第二块虚拟硬盘，格式化为 ext4 并挂载，再选择该盘里的文件夹。尚未修改系统或设置恢复标记。");
     need(filesystem.at("fstype") == "ext4", "所选位置不在 ext4 恢复磁盘上。请选择另一块已挂载的 ext4 磁盘；目前不会自动格式化磁盘。");
-    auto options = "," + filesystem.at("options").get<std::string>() + ",";
+    auto options = filesystem.at("options").get<std::string>(); options.insert(0, 1, ','); options.push_back(',');
     need(options.find(",rw,") != std::string::npos, "所选恢复磁盘是只读的，请以可写方式挂载后重试。");
     auto mount = fs::path(filesystem.at("target").get<std::string>()).lexically_normal();
     auto location = fs::absolute(selected).lexically_normal();
