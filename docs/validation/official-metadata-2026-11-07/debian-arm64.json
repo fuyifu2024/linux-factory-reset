@@ -1,0 +1,13 @@
+{
+  "arch": "arm64",
+  "automatic_restore": false,
+  "distro": "debian",
+  "edition": "netinst",
+  "filename": "debian-13.7.0-arm64-netinst.iso",
+  "format": "iso",
+  "release": "stable",
+  "sha256": "6e93fa1759bd9d4b0fc11e938987de6967ee7de5297dac1be27c3a75cc17024b",
+  "size": 0,
+  "trust": "SHA-256 from official HTTPS metadata; detached PGP signature not checked in ISO downloader",
+  "url": "https://cdimage.debian.org/debian-cd/current/arm64/iso-cd/debian-13.7.0-arm64-netinst.iso"
+}

@@ -39,3 +39,5 @@ New checks cover distro identification, generic ARM64 UEFI selection, distro/CPU
 剩余未验证：完整真实官方大镜像导入、真实 initramfs 启动恢复与首次开户、Fedora 恢复引擎、ISO 自动安装、断电/磁盘故障。请勿把容器测试或二进制静态检查称为这些能力的验收。
 
 The new checks use six disposable distro/architecture containers, a real local HTTPS fixture, a GPU-less GUI launch, a deterministic dialog double and synthetic filesystem fixtures. None establishes a bootable real-machine restore. HTTPS and GUI-double scripts mutate their disposable container and must not run on a real user host.
+
+本版通过情况及对应提交、云端运行链接见 [v0.3 验证记录](validation/v0.3.0-alpha.1.md)。

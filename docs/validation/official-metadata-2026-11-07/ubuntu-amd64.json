@@ -1,0 +1,13 @@
+{
+  "arch": "amd64",
+  "automatic_restore": false,
+  "distro": "ubuntu",
+  "edition": "desktop",
+  "filename": "ubuntu-26.04.1-desktop-amd64.iso",
+  "format": "iso",
+  "release": "26.04",
+  "sha256": "601e30fbf5d97759367c632e2c33630665039b7e2158fd068403da3ccf1bda1f",
+  "size": 0,
+  "trust": "SHA-256 from official HTTPS metadata; detached PGP signature not checked in ISO downloader",
+  "url": "https://releases.ubuntu.com/26.04/ubuntu-26.04.1-desktop-amd64.iso"
+}

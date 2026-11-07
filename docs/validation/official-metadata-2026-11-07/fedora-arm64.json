@@ -1,0 +1,13 @@
+{
+  "arch": "arm64",
+  "automatic_restore": false,
+  "distro": "fedora",
+  "edition": "workstation",
+  "filename": "Fedora-Workstation-Live-45-1.4.aarch64.iso",
+  "format": "iso",
+  "release": "45",
+  "sha256": "ad73a977709d417f5b7dda4147fc071396b9d8d2bdcca2df615aa3aab7673710",
+  "size": 2987100160,
+  "trust": "SHA-256 from official HTTPS metadata; detached PGP signature not checked in ISO downloader",
+  "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/45/Workstation/aarch64/iso/Fedora-Workstation-Live-45-1.4.aarch64.iso"
+}
