@@ -66,7 +66,7 @@ UF_LOOP=$(losetup --find --show --read-only "$UF_IMAGE") || uf_fail 'Cannot crea
 mount -t squashfs -o ro "$UF_LOOP" /run/uf-source || uf_fail 'Cannot mount verified recovery profile'
 if [ ! -f /run/uf-source/root/usr/lib/os-release ] || [ ! -f /run/uf-source/root/etc/passwd ]; then uf_fail 'Invalid root profile'; fi
 uf_validate_profile "$UF_PLATFORM" "$UF_DISTRO" /run/uf-source/root /run/uf-source/boot || uf_fail 'Profile boot pointers are not safely relocatable'
-mount -t vfat "$UF_BOOT_DEV" /run/uf-boot || uf_fail 'Cannot mount boot partition'
+mount -t vfat -o iocharset=utf8,codepage=437 "$UF_BOOT_DEV" /run/uf-boot || uf_fail 'Cannot mount boot partition'
 
 # Check capacity before the first deletion. This is not a power-failure transaction.
 uf_root_report=$(du -sk --apparent-size /run/uf-source/root) || uf_fail 'Cannot size profile'

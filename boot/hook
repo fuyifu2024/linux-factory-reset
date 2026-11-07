@@ -13,6 +13,6 @@ for tool in rsync sha256sum du df stat find cat readlink grep sed awk mkdir rm s
 done
 copy_exec /usr/sbin/blkid /usr/sbin/blkid
 copy_exec /usr/sbin/losetup /usr/sbin/losetup
-for module in ext4 squashfs loop vfat nls_utf8 nls_cp437 usb_storage uas xhci_pci; do
+for module in ext4 squashfs loop vfat nls_utf8 nls_ascii nls_cp437 usb_storage uas xhci_pci; do
     manual_add_modules "$module"
 done
