@@ -178,13 +178,13 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
     fs::remove(r / "var/lib/systemd/random-seed");
     if (fs::is_directory(r / "etc/ssh")) for (const auto& e : fs::directory_iterator(r / "etc/ssh")) if (str(e.path().filename()).starts_with("ssh_host_") && e.is_regular_file()) fs::remove(e.path());
     auto boot_mount = kind == "raspi-arm64" ? "/boot/firmware" : "/boot/efi";
-    std::istringstream lines(read(r / "etc/fstab")); std::string line, old_uuid; bool hasroot = false;
+    std::istringstream lines(read(r / "etc/fstab")); std::string line, old_uuid, root_spec; bool hasroot = false;
     while (std::getline(lines, line)) {
         auto pos = line.find_first_not_of(" \t"); if (pos == std::string::npos || line[pos] == '#') continue;
         std::istringstream f(line); std::string spec, point, type; f >> spec >> point >> type;
         need(point == "/" || point == boot_mount, "Complex fstab/swap layouts are unsupported");
         if (point == "/") {
-            need(type == "ext4", "Reference root must be ext4"); hasroot = true;
+            need(type == "ext4", "Reference root must be ext4"); need(!hasroot, "Duplicate reference root mount"); hasroot = true; root_spec = spec;
             if (spec.starts_with("UUID=")) old_uuid = spec.substr(5);
             else if (kind != "raspi-arm64" && (spec.starts_with("PARTUUID=") || spec.starts_with("LABEL="))) {
                 // Official installed images commonly use PARTUUID. Resolve it only from
@@ -211,6 +211,7 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
             require_inside(p == r / "boot/grub/grub.cfg" ? r : b, p);
             need(!fs::is_symlink(p), "Unsafe GRUB config symlink"); auto text = read(p);
             need(text.find(old_uuid) != std::string::npos, "Standard GRUB configs must reference the root UUID; embedded/custom layouts are unsupported");
+            if (p == r / "boot/grub/grub.cfg") text = normalize_grub_roots(text, old_uuid, root_spec);
             replace_all(text, old_uuid, "@ROOT_UUID@"); write(p, text);
         }
         // Both x86_64 and generic ARM64 UEFI use the local-console first-user wizard.

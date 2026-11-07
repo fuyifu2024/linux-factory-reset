@@ -124,6 +124,10 @@ int main() {
         check(signed_checksum(sum + "  a.img.xz\n", "a.img.xz") == sum, "signed text checksum format");
         rejects([&] {signed_checksum(sum + "  a\n" + sum + "  a\n", "a");}, "duplicate checksum");
         rejects([&] {signed_checksum(sum + "  different\n", "missing");}, "missing checksum");
+        auto grub_normal = normalize_grub_roots("set root='hd0,gpt1'\nlinux /boot/vmlinuz root=PARTUUID=part-1234 ro\n", "root-1234", "PARTUUID=part-1234");
+        check(grub_normal.find("set root='hd0,gpt1'") != std::string::npos && grub_normal.find("root=UUID=@ROOT_UUID@ ro") != std::string::npos, "kernel PARTUUID normalized without changing GRUB root variable");
+        rejects([] {normalize_grub_roots("linux /vmlinuz root=UUID=foreign-1111\n", "root-1234", "PARTUUID=part-1234");}, "foreign kernel root refused");
+        rejects([] {normalize_grub_roots("linux /vmlinuz root=UUID=root-1234 root=UUID=root-1234\n", "root-1234", "UUID=root-1234");}, "ambiguous kernel root refused");
         check(relocate("UUID=@ROOT_UUID@ /\nUUID=@BOOT_UUID@ /boot\n", "1111-2222", "3333-4444") == "UUID=1111-2222 /\nUUID=3333-4444 /boot\n", "UUID relocation");
         check(output({"printf", "%s", "$(touch SHOULD_NOT_EXIST);literal"}) == "$(touch SHOULD_NOT_EXIST);literal", "arguments never evaluated by shell");
         check(command({"false"}).code != 0, "command failure propagation");

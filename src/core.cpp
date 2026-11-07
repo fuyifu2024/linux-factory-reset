@@ -241,6 +241,24 @@ std::string signed_checksum(const std::string& text, const std::string& filename
     }
     need(!found.empty(), "Image is absent from signed Ubuntu checksums"); return found;
 }
+
+std::string normalize_grub_roots(const std::string& text, const std::string& source_uuid, const std::string& source_spec) {
+    need(valid_uuid(source_uuid), "Invalid source root UUID");
+    std::istringstream lines(text); std::ostringstream result; std::string line; bool kernel = false;
+    const std::regex arg("\\broot=([^ \\t]+)");
+    while (std::getline(lines, line)) {
+        std::istringstream fields(line); std::string token; fields >> token;
+        if (token == "linux" || token == "linuxefi" || token == "linux16") {
+            std::smatch match; need(std::regex_search(line, match, arg), "Kernel entry has no root argument");
+            auto value = match[1].str(); need(value == source_spec || value == "UUID=" + source_uuid, "GRUB kernel entry refers to another root filesystem");
+            need(!std::regex_search(match.suffix().str(), arg), "Ambiguous multiple kernel root arguments");
+            line = std::regex_replace(line, arg, "root=UUID=@ROOT_UUID@"); kernel = true;
+        }
+        result << line << '\n';
+    }
+    need(kernel, "No supported GRUB Linux kernel entry found"); return result.str();
+}
+
 std::string relocate(const std::string& input, const std::string& root, const std::string& boot) {
     need(valid_uuid(root) && valid_uuid(boot), "Invalid relocation UUID");
     auto text = input;

@@ -40,6 +40,7 @@ fs::path recovery_mount(const fs::path& selected, const json& filesystem, const 
 std::string boot_config(const json& state);
 void https(const std::string& url, bool official = false);
 std::string signed_checksum(const std::string& sums, const std::string& filename);
+std::string normalize_grub_roots(const std::string& text, const std::string& source_uuid, const std::string& source_spec);
 std::string relocate(const std::string& input, const std::string& root, const std::string& boot);
 void set_download_proxy(const std::string& value);
 bool stock_pi_boot(const std::string& config);
