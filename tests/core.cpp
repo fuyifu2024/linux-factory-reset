@@ -51,8 +51,8 @@ int main() {
         TransferProgress progress{1024, 2048, 512};
         check(progress.percent() == 50 && progress.text().find("/s") != std::string::npos && progress.text().find("秒") != std::string::npos, "percent speed and ETA are visible");
         check(TransferProgress{1,0,0}.percent() == 0 && TransferProgress{10,10,1}.percent() == 99, "unknown sizes and verification keep progress below success");
-        auto official = parse_sums(std::string(64,'a') + " *ubuntu-26.04.1-desktop-arm64.iso\n", "ubuntu", "26.04", "desktop", "arm64", "https://cdimage.ubuntu.com/releases/26.04/release/");
-        check(official.arch == "arm64" && !official.describe().at("automatic_restore").get<bool>(), "official ISO metadata never enables reset");
+        auto official = parse_sums(std::string(64,'c') + " *ubuntu-26.04-desktop-arm64.iso\n" + std::string(64,'a') + " *ubuntu-26.04.1-desktop-arm64.iso\n", "ubuntu", "26.04", "desktop", "arm64", "https://cdimage.ubuntu.com/releases/26.04/release/");
+        check(official.filename == "ubuntu-26.04.1-desktop-arm64.iso" && official.arch == "arm64" && !official.describe().at("automatic_restore").get<bool>(), "official ISO metadata never enables reset");
         rejects([&] {parse_sums(std::string(64,'a') + " *../../escape.iso\n", "debian", "stable", "netinst", "amd64", "https://cdimage.debian.org/");}, "unsafe checksum filename rejected");
         json releases = json::array();
         for (const auto& version : {"45 Beta", "43", "44"}) releases.push_back({{"version", version}, {"arch", "aarch64"}, {"subvariant", "Workstation"}, {"link", "https://download.fedoraproject.org/pub/Fedora-" + std::string(version == std::string("45 Beta") ? "45" : version) + ".iso"}, {"sha256", std::string(64,'b')}, {"size", "1024"}});

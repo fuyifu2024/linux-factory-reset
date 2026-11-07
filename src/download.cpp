@@ -111,13 +111,18 @@ OfficialImage parse_sums(const std::string& text, const std::string& distro, con
     need(edition == "netinst" || edition == "desktop" || edition == "server", "Unsupported image edition");
     const std::string pattern = distro == "debian" ? "debian-[0-9]+(\\.[0-9]+)*-" + arch + "-netinst\\.iso" :
         std::string("ubuntu-[0-9]+\\.[0-9]+(\\.[0-9]+)*-") + (edition == "server" ? "live-server" : "desktop") + "-" + arch + "\\.iso";
-    std::istringstream lines(text); std::string line; OfficialImage found;
+    std::istringstream lines(text); std::string line; OfficialImage found; std::vector<int> newest;
     while (std::getline(lines, line)) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.size() < 67 || line[64] != ' ' || (line[65] != ' ' && line[65] != '*')) continue;
         auto filename = line.substr(66);
         if (!std::regex_match(filename, std::regex(pattern))) continue;
-        need(found.filename.empty(), "官网校验清单中有多个匹配镜像，无法安全选择");
+        auto start = filename.find('-') + 1; auto version = filename.substr(start, filename.find('-', start) - start);
+        if (distro == "ubuntu" && version != release && !version.starts_with(release + ".")) continue;
+        std::vector<int> key; std::istringstream parts(version); std::string number;
+        while (std::getline(parts, number, '.')) { need(number.size() <= 4, "Invalid release version"); key.push_back(std::stoi(number)); }
+        if (!found.filename.empty() && key < newest) continue;
+        need(found.filename.empty() || key != newest, "官网校验清单含重复版本，无法安全选择"); newest = key;
         found = {distro, release, edition, arch, filename, base + filename, line.substr(0,64), 0}; validate(found);
     }
     need(!found.filename.empty(), "官网暂未提供所选版本/架构的镜像，请选择其他版本。没有使用第三方来源。"); return found;
