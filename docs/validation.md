@@ -41,3 +41,7 @@ New checks cover distro identification, generic ARM64 UEFI selection, distro/CPU
 The new checks use six disposable distro/architecture containers, a real local HTTPS fixture, a GPU-less GUI launch, a deterministic dialog double and synthetic filesystem fixtures. None establishes a bootable real-machine restore. HTTPS and GUI-double scripts mutate their disposable container and must not run on a real user host.
 
 本版通过情况及对应提交、云端运行链接见 [v0.3 验证记录](validation/v0.3.0-alpha.1.md)。
+
+## v0.4.0-alpha.1
+
+实际 Debian 13 AMD64 UEFI 虚拟机的本地 IMG 与官方自动下载恢复均已通过；范围与限制、关机后结果文件见 [v0.4 验收记录](validation/v0.4.0-alpha.1.md)。ARM64 来源验证与实际 ARM64 启动验证是不同范围。
