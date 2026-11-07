@@ -1,92 +1,87 @@
-# Ubuntu / Debian Reset
+# Linux Factory Reset
 
-[简体中文](README.md) · [Releases](https://github.com/fuyifu2024/ubuntu-reset/releases) · [Validation](docs/validation.md)
+[简体中文](README.md) · [Releases](https://github.com/fuyifu2024/linux-factory-reset/releases) · [Validation](docs/validation.md)
 
-A **C++20 application with a Chinese desktop entry and Shell recovery scripts**. Download trusted initial-system data, reboot into initramfs, remove previous users/data/extra software, and restore files without formatting partitions or manually running an installer. The repository, package and CLI remain named `ubuntu-reset` for compatibility.
+A C++20 official-image downloader and experimental Linux recovery tool. Renamed from `ubuntu-reset`; the old command remains a compatibility entry point.
 
-> **v0.2.0-alpha.1 is experimental.** File-tree recovery and cross-distribution packaging are tested. Real hardware reboot recovery, initial setup and physical BIOS reset have not been validated. Use disposable test systems.
+**Development preview: this is not yet a universal one-click factory reset for arbitrary Linux installations.** The reset backend removes existing accounts and files, but a real VM/hardware reboot-and-restore acceptance test has not been completed.
 
-## Platforms
+## Capabilities
 
-| Distribution and CPU | Boot layout | Recovery source |
-|---|---|---|
-| Debian 12/13, generic ARM64 | UEFI + GRUB, ext4 `/`, FAT `/boot/efi`, `EFI/debian` | Trusted administrator/OEM installed-system profile matching the device |
-| Ubuntu, generic ARM64 | UEFI + GRUB, ext4 `/`, FAT `/boot/efi`, `EFI/ubuntu` | Matching administrator/OEM profile |
-| Debian/Ubuntu, x86_64 | Same layout; distro-specific EFI directory and x64 loader | Matching administrator/OEM profile |
-| Ubuntu, Raspberry Pi 5 native firmware | ext4 `/`, FAT `/boot/firmware`, stock Ubuntu `current/` recipe | Automatic download and GPG verification of an official Ubuntu preinstalled desktop image |
+| Feature | Actual status |
+| --- | --- |
+| Official downloads | Ubuntu 24.04 / 26.04, current stable Debian, latest stable Fedora; AMD64 and ARM64 |
+| Progress | Percentage, bytes, average speed, ETA and cancellation; unknown server sizes are labelled |
+| Integrity | SHA-256 from official HTTPS metadata; mismatches never become final files. Detached PGP signatures are not checked by the ISO downloader |
+| Local recovery import | IMG / RAW, XZ disk images, standalone QCOW2, project Squashfs; requires a compatible pristine installed system |
+| Debian / Ubuntu reset engine | Experimental ordinary ext4 root + separate FAT ESP, standard GRUB, ARM64/x86_64 UEFI; native Ubuntu Pi firmware detected internally |
+| Automatic installation from ISO | **Not implemented**. Downloading an ISO does not enable restoration or arm reset |
+| Fedora reset engine | **Not implemented**. Official download works; RPM, dracut, SELinux and Btrfs restoration remain future work |
+| Linux Mint | Not integrated; no official ARM64 image is assumed |
 
-ARM64 support includes compatible UEFI servers, virtual machines, ARM64 computers and development boards; it is **not limited to Raspberry Pi**. A Pi booting through UEFI uses the generic `arm64-uefi` path. Matching boot layout and a device-compatible profile are required; this is not a claim that every device has been validated.
+ARM64 includes generic UEFI VMs, servers and compatible computers. Native U-Boot and other board boot flows are unsupported. Matching CPU architecture alone does not make board images interchangeable.
 
-Native non-UEFI U-Boot/extlinux/bare-firmware layouts need separate adapters. ARM32, LUKS, LVM, RAID, Btrfs, separate `/home` or `/boot`, dual-boot and custom boot schemes are unsupported. The existing native-Pi adapter is Ubuntu-specific; other Debian Pi firmware layouts are not supported by that adapter.
+## Install and use
 
-**Debian and generic ARM64 use `prepare-profile`, not an automatic arbitrary ISO import.** Installer/live filesystems are not equivalent to installed systems. Cross-distribution Debian/Ubuntu replacement is rejected. See [profile preparation](docs/profiles.md).
-
-## Operation
-
-1. For native Ubuntu Pi, download an official image and verify the Ubuntu GPG signature plus SHA-256. Otherwise download a trusted Debian/Ubuntu Squashfs profile and verify an independently trusted SHA-256.
-2. Keep complete pristine reference data on a **separate ext4 recovery partition**. Initial preparation downloads complete data; it is not a network-delta downloader.
-3. Preview changes with `plan`. After explicit confirmation, build a recovery initramfs and write the reset marker last.
-4. On the next boot, verify target UUIDs, recovery hash, capacity and mount layout before modifying the installed system. Restore changed/missing files, reuse identical file content, remove extra files and previous users.
-5. Relocate GRUB pointers using `EFI/debian` or `EFI/ubuntu` and the correct architecture loader (`grubaa64.efi` for ARM64, `grubx64.efi` for x86_64).
-6. Reboot into initial setup. Generic UEFI profiles include a local tty1 administrator-creation flow; native Ubuntu Pi retains the official image's setup flow.
-
-The selected source defines the initial system; historical personal installation choices cannot be reconstructed automatically. Previous `/home` and `/root` data is logically deleted, not securely erased. Other disks and the recovery partition remain. The tool itself disappears after restoration if it is absent from the reference.
-
-## Downloads and installation
-
-[Releases](https://github.com/fuyifu2024/ubuntu-reset/releases) contain **Chinese and English notes**, source archives, native ARM64/amd64 binaries, DEB packages and SHA-256 checksums. Choose `ubuntu24.04`, `debian12` or `debian13`, then `arm64` or `amd64`. Ubuntu builds may run on newer Ubuntu versions satisfying their dependencies. ARM64 binaries target AArch64 userspace, not a particular board brand.
+Choose the `.deb` matching your system and architecture from [Releases](https://github.com/fuyifu2024/linux-factory-reset/releases). Debian 12, Debian 13 and Ubuntu 24.04 builds are provided for AMD64/ARM64. Prefer DEB installation to resolve runtime dependencies.
 
 ```sh
-sudo apt install ./matching-distribution-and-architecture.deb
-ubuntu-reset gui
+sudo apt install ./linux-factory-reset_*.deb
+linux-factory-reset gui
 ```
 
-Raw executables dynamically link system libraries. Install the DEB for the complete recovery scripts. The package has no installation script that arms a reset, rebuilds initramfs or reboots; installing dependencies may trigger normal distribution maintenance.
+The unified interface offers official downloads, recovery preparation, a change preview and restoration. Ordinary users do not need to host an HTTPS source or paste checksum strings. Custom administrator sources remain under Advanced.
 
-## CLI
-
-Prepare and mount a separate ext4 recovery partition yourself. The tool does not partition or format disks. Preparation requires space for downloads, expanded images, staging and compressed profiles; a 64 GB or larger recovery device is recommended, subject to capacity checks.
+Official ISO downloads run without administrator privileges or a second disk. Select distribution, release, edition, architecture and a download folder. Addresses and checksums come from official metadata; Fedora prereleases are excluded.
 
 ```sh
-# Debian/Ubuntu generic ARM64 or x86_64, with a trusted matching installed-system profile
-sudo ubuntu-reset prepare-profile \
-  --url https://your-trusted-server.example/factory.squashfs \
-  --sha256 YOUR_INDEPENDENTLY_TRUSTED_SHA256 \
-  --storage /mnt/recovery
-
-# Native Ubuntu Raspberry Pi 5 only
-sudo ubuntu-reset prepare-pi --release 26.04.1 --storage /mnt/recovery
-
-ubuntu-reset status
-sudo ubuntu-reset plan
-
-# Disposable test system only; explicit confirmation, no immediate reboot by default
-sudo ubuntu-reset arm --confirm ERASE-ALL-USERS
-sudo ubuntu-reset cancel  # cancel before reboot
+linux-factory-reset catalog
+linux-factory-reset resolve --distro fedora --release stable --edition workstation --arch arm64
+linux-factory-reset download --distro debian --release stable --edition netinst --arch arm64 --directory ~/Downloads
 ```
 
-The GUI's final confirmation uses `arm --confirm ERASE-ALL-USERS --reboot`. Keep recovery storage connected. CLI preparation optionally accepts `--proxy http://127.0.0.1:PORT` or `--proxy socks5h://127.0.0.1:PORT`; TLS and integrity checks remain enabled.
+Ubuntu: `--release 24.04|26.04`, `--edition desktop|server`. Fedora: `--release stable`, `--edition workstation|server`. If the official site lacks a selected combination, the tool stops with an explanation instead of using a third-party source. Optional explicit proxy: `--proxy http://127.0.0.1:7890`; user proxy environment variables also work.
 
-## Build and tests
+## Experimental recovery preparation
+
+Provide a separate mounted **ext4 recovery partition**. The application does not partition or format disks. In a VM, add a second virtual disk first. Any subdirectory on that recovery partition can be selected; the actual mountpoint is detected, and files are placed under its compatibility `ubuntu-reset/` directory. A folder on the running system filesystem is not a recovery partition.
 
 ```sh
-sudo apt install build-essential cmake file libssl-dev nlohmann-json3-dev \
-  rsync squashfs-tools curl gpgv xz-utils util-linux findutils udev \
-  initramfs-tools zenity pkexec
+sudo linux-factory-reset prepare-image --file /path/to/pristine-system.img --storage /mnt/recovery/folder
+sudo linux-factory-reset plan
+```
+
+An imported image must contain a pristine installed system of the same distribution, CPU architecture and boot layout, with exactly one ext4 system partition and one FAT boot partition, and no existing personal accounts. Installer/live ISOs, incremental QCOW2 and encrypted disks are not installed-system references. Local files are snapshotted privately and parsed read-only; a computed file hash does not authenticate its publisher.
+
+Automatic recovery-source preparation appears only on supported detected hardware. Currently it is built in for the Ubuntu 26.04 native Pi boot adapter and checks signed checksums. Generic Debian/Ubuntu UEFI devices still require local installed-system images or administrator-prepared profiles. **Downloading an official ISO is separate from preparing a usable recovery source.**
+
+Previewing changes requires prepared recovery data. Missing state now gives setup guidance; actual backend errors are displayed and can be copied. Preparation/comparison shows a busy dialog.
+
+```sh
+sudo linux-factory-reset arm --confirm ERASE-ALL-USERS --reboot
+# Cancel before reboot:
+sudo linux-factory-reset cancel
+```
+
+Restore runs offline in initramfs and overwrites the root and boot filesystems, deleting old users, personal files, additional software and configuration. Keep recovery media connected. It is neither a power-loss transaction nor a secure disk wipe. Btrfs, LVM, encryption, RAID, separate `/home` or `/boot` and additional system partitions are unsupported. A new administrator is created at first boot. Downloads/previews do not arm reset, reboot or change BIOS settings.
+
+## Graphics compatibility and upgrades
+
+The GUI defaults to Cairo/software rendering for VMs without working EGL/Zink drivers. It changes only its own process environment and preserves explicit user overrides.
+
+```sh
+GSK_RENDERER=cairo LIBGL_ALWAYS_SOFTWARE=1 linux-factory-reset gui
+```
+
+Legacy state directories, initramfs hook names and recovery-directory names are retained to avoid multiple incompatible reset markers. The new DEB replaces the old package. Upgrading does not prepare or arm recovery.
+
+## Build and validation
+
+```sh
+sudo apt install build-essential cmake libssl-dev libcurl4-openssl-dev nlohmann-json3-dev rsync squashfs-tools
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
 cmake --build build -j2
 ctest --test-dir build --output-on-failure
-(cd build && cpack -G DEB)
 ```
 
-Official native-Pi verification additionally needs the Ubuntu keyring. Debian's generic path has no `ubuntu-keyring` dependency. Runtime library dependencies, including OpenSSL package names, are derived from each distribution build. No Python dependency is required.
-
-CI builds, tests, packages and non-destructively installs the package in Ubuntu 24.04, Debian 12 and Debian 13 containers on both ARM64 and amd64. Those checks do not validate hardware recovery.
-
-## Firmware and failure boundaries
-
-`ubuntu-reset firmware-status` detects an explicit factory BIOS-reset interface on supported x86 firmware. The separate, confirmed `reset-firmware --confirm RESET-BIOS-DEFAULTS` operation requests defaults only where supported; verify them after reboot. It is not automatically coupled to OS restoration and does not clear EFI variables or Secure Boot keys.
-
-Download/verification/preparation failure does not arm reset. Offline errors stop in rescue/halt rather than booting a partially restored system. **Restoration is not a cross-partition transaction; power loss can damage the OS and boot files. Keep independent rescue media.** See [recovery design](docs/recovery.md) and [validation limits](docs/validation.md).
-
-Implemented independently after reviewing [Resetter](https://github.com/gaining/Resetter), [Timeshift](https://github.com/linuxmint/timeshift) and [Snapper](https://github.com/openSUSE/snapper); no source copied. [Research references](docs/research.md). MIT license; not an official Canonical or Debian product.
+[CI](.github/workflows/ci.yml) uses temporary directories, synthetic system trees, a local HTTPS fixture inside disposable containers, and a virtual display without a GPU. A successful build or directory fixture does not establish bootable real-machine recovery. See [validation](docs/validation.md) and [recovery protocol](docs/recovery.md).

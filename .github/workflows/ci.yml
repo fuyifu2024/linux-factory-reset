@@ -32,7 +32,7 @@ jobs:
       - name: Real HTTPS download and cancellation in disposable container
         run: sh tests/https.sh "$PWD/build/test-download"
       - name: Shell validation
-        run: shellcheck -e SC1091 boot/hook boot/local-bottom boot/reconcile.sh boot/relocate.sh firstboot/firstboot.sh tests/reconcile.sh tests/relocate.sh tests/https.sh
+        run: shellcheck -e SC1091 boot/hook boot/local-bottom boot/reconcile.sh boot/relocate.sh firstboot/firstboot.sh tests/reconcile.sh tests/relocate.sh tests/https.sh tests/gui-flow.sh
       - name: Package
         run: cd build && cpack -G DEB
       - name: Install package in disposable container (never arm reset)
@@ -55,6 +55,8 @@ jobs:
           cat /tmp/gui-smoke.log
           test "$TASK_STATUS" -eq 124
           if grep -E 'MESA: error|ZINK:|libEGL warning|failed to create dri2' /tmp/gui-smoke.log; then exit 1; fi
+      - name: Drive missing-state GUI flow without privileged actions
+        run: sh tests/gui-flow.sh /usr/bin/linux-factory-reset
       - name: Collect distro-specific binary and package
         env:
           TASK_DISTRO: ${{ matrix.os.label }}

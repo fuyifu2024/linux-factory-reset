@@ -158,7 +158,7 @@ fs::path download_official(const OfficialImage& image, const fs::path& directory
     auto pattern = (folder / ("." + image.filename + ".part-XXXXXX")).string(); std::vector<char> name(pattern.begin(), pattern.end()); name.push_back(0);
     int fd = mkstemp(name.data()); need(fd >= 0, "无法创建下载临时文件"); fs::path partial(name.data());
     try {
-        Transfer t; t.fd = fd; t.limit = std::min(image_limit, free - (256ULL << 20)); t.callback = std::move(progress);
+        Transfer t; t.fd = fd; t.limit = std::min<uint64_t>(image_limit, free - (256ULL << 20)); t.callback = std::move(progress);
         if (t.callback && !t.callback({0, image.size, 0})) throw Cancelled();
         request(image.url, t, proxy); need(t.written > 0 && (!image.size || t.written == image.size), "镜像大小与官网记录不符");
         need(fsync(fd) == 0, "Cannot flush downloaded image"); close(fd); fd = -1;
