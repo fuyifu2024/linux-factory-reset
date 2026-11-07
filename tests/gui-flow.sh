@@ -1,6 +1,7 @@
 #!/bin/sh
 # Disposable CI container only. A deterministic dialog double drives the real GUI controller.
 set -eu
+[ -f /.dockerenv ] || { echo "This fixture mutates a disposable CI container; refusing a real host"; exit 1; }
 app=$1
 fixture=$(mktemp -d)
 cp /usr/bin/zenity "$fixture/zenity.original"

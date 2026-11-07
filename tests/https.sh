@@ -1,6 +1,7 @@
 #!/bin/sh
 # CI ONLY: private, disposable container; never run on the user's real host.
 set -eu
+[ -f /.dockerenv ] || { echo "This fixture mutates a disposable CI container; refusing a real host"; exit 1; }
 app=$1
 fixture=$(mktemp -d)
 server=''

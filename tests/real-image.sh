@@ -2,6 +2,7 @@
 # MANUAL CI ONLY. Mounts a verified official image read-only on a disposable remote runner.
 # This script must never be run on the developer/user's real machine.
 set -eu
+[ "${GITHUB_ACTIONS:-}" = true ] || { echo "Refusing image operations outside the disposable runner"; exit 1; }
 app=$1
 evidence=$2
 assets=$3
