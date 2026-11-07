@@ -23,6 +23,24 @@ int main() {
         check(valid_uuid("01234567-89ab-cdef-0123-456789abcdef") && valid_uuid("ABCD-1234"), "UUID formats");
         check(!valid_uuid("a';reboot #") && !valid_uuid("../../dev/sda"), "UUID injection rejected");
         auto s = state(); validate_state(s); check(boot_config(s).find("UF_ROOT='1111-2222'") != std::string::npos, "boot config");
+        check(state_distro(s) == "ubuntu", "legacy schema 1 distro compatibility");
+        auto debian_state = s; debian_state["schema"] = 2; debian_state["distro"] = "debian"; debian_state["platform"] = "arm64-uefi";
+        validate_state(debian_state);
+        check(boot_config(debian_state).find("UF_DISTRO='debian'") != std::string::npos, "Debian ARM64 state reaches offline boot");
+        auto invalid = debian_state; invalid["distro"] = "../evil";
+        rejects([&] {boot_config(invalid);}, "EFI distributor injection rejected");
+        invalid = debian_state; invalid["platform"] = "raspi-arm64";
+        rejects([&] {validate_state(invalid);}, "Debian cannot use the Ubuntu native-Pi adapter");
+        check(distribution("ID=debian\nVERSION_ID=\"13\"\n").at("id") == "debian", "Debian os-release");
+        check(distribution("ID='ubuntu'\nVERSION_ID='24.04'\n").at("version_id") == "24.04", "quoted Ubuntu os-release");
+        rejects([] {distribution("ID=mint\nID_LIKE=debian\n");}, "unvalidated derivative rejected");
+        rejects([] {distribution("ID=debian\nID=ubuntu\n");}, "ambiguous distribution rejected");
+        check(select_platform("aarch64", true, "Ampere server", "debian") == "arm64-uefi", "Debian ARM server detected by UEFI");
+        check(select_platform("aarch64", true, "QEMU Virtual Machine", "ubuntu") == "arm64-uefi", "generic Ubuntu ARM VM");
+        check(select_platform("aarch64", true, "Raspberry Pi 5", "debian") == "arm64-uefi", "UEFI Pi uses generic Debian path");
+        check(select_platform("x86_64", true, "", "debian") == "x86_64-uefi", "Debian x86 UEFI");
+        check(select_platform("aarch64", false, "Raspberry Pi 5", "ubuntu") == "raspi-arm64", "native Ubuntu Pi compatibility");
+        rejects([] {select_platform("aarch64", false, "Generic U-Boot board", "debian");}, "non-UEFI board is not falsely supported");
         auto bad = s; bad["file"] = "../../etc/shadow"; rejects([&] {validate_state(bad);}, "profile path traversal");
         bad = s; bad["root_uuid"] = bad["store_uuid"]; rejects([&] {validate_state(bad);}, "overlapping filesystems");
         bad = s; bad["id"] = "';reboot"; rejects([&] {boot_config(bad);}, "shell injection in state");
@@ -71,6 +89,46 @@ int main() {
         check(fs::is_directory(unpack / "root/dev"), "runtime mountpoints present");
         write(r / "etc/passwd", "root:x:0:0:root:/root:/bin/bash\nalice:x:1000:1000:Alice:/home/alice:/bin/bash\n");
         rejects([&] {make_profile(r, b, "raspi-arm64", tmp.path / "bad.squashfs", {});}, "personal reference rejected");
+        // Build real Squashfs profiles for both distros/architectures from synthetic,
+        // non-executable file trees. No firmware or running root is modified.
+        for (const auto& distro_version : {std::pair<std::string, std::string>{"ubuntu", "24.04"}, {"debian", "12"}, {"debian", "13"}}) {
+            for (const std::string platform : {"arm64-uefi", "x86_64-uefi"}) {
+                const auto& [distro, version] = distro_version;
+                auto base = tmp.path / (distro + version + platform);
+                auto ur = base / "reference", ub = base / "esp";
+                for (const auto& dir : {"etc", "usr/bin", "usr/sbin", "usr/lib", "var/lib/dpkg", "boot/grub", "home"}) fs::create_directories(ur / dir);
+                auto efi = efi_directory(ub, distro); fs::create_directories(efi);
+                auto image_elf = elf; image_elf[18] = platform == "arm64-uefi" ? static_cast<char>(183) : static_cast<char>(62);
+                write(ur / "usr/bin/bash", image_elf);
+                write(ur / "usr/lib/os-release", "ID=" + distro + "\nVERSION_ID=\"" + version + "\"\n");
+                write(ur / "etc/passwd", "root:x:0:0:root:/root:/bin/bash\n");
+                write(ur / "etc/shadow", "root:!:1:0:99999:7:::\n");
+                write(ur / "etc/group", "root:x:0:\nsudo:x:27:\n");
+                write(ur / "etc/fstab", "UUID=01234567-abcd / ext4 defaults 0 1\nUUID=ABCD-1234 /boot/efi vfat defaults 0 2\n");
+                write(ur / "var/lib/dpkg/status", "Package: base-files\nStatus: install ok installed\n");
+                for (const auto& tool : {"usr/bin/sudo", "usr/bin/passwd", "usr/sbin/useradd", "usr/sbin/usermod"}) write(ur / tool, image_elf);
+                write(ur / "boot/grub/grub.cfg", "linux /boot/vmlinuz root=UUID=01234567-abcd ro\n");
+                write(efi / "grub.cfg", "search.fs_uuid 01234567-abcd root\nset prefix=($root)/boot/grub\n");
+                auto loader = efi / (platform == "arm64-uefi" ? "grubaa64.efi" : "grubx64.efi");
+                write(loader, "synthetic loader fixture; never executed");
+                auto profile = base / "factory.squashfs";
+                make_profile(ur, ub, platform, profile, {{"type", "synthetic distro fixture"}}, UFRESET_TEST_ASSETS);
+                auto extracted = base / "extracted"; run({"unsquashfs", "-no-progress", "-d", extracted.string(), profile.string()});
+                auto meta = json::parse(read(extracted / "profile.json"));
+                check(meta.at("schema") == 2 && meta.at("distro") == distro && meta.at("platform") == platform, "distro + architecture profile identity");
+                check(meta.at("version_id") == version, "reference distribution version retained");
+                validate_reference(extracted / "root", extracted / "boot", platform, true); ++checks;
+                check(read(efi_directory(extracted / "boot", distro) / "grub.cfg").find("@ROOT_UUID@") != std::string::npos, "correct distributor EFI pointer relocatable");
+                check(read(extracted / "root/boot/grub/grub.cfg").find("@ROOT_UUID@") != std::string::npos, "UEFI root menu relocatable");
+                check(fs::is_symlink(extracted / "root/etc/systemd/system/multi-user.target.wants/ubuntu-reset-firstboot.service"), "generic UEFI first-user wizard enabled");
+                check(read(ur / "etc/fstab").find("01234567-abcd") != std::string::npos, "original reference left unchanged");
+                fs::remove(loader);
+                rejects([&] {validate_reference(ur, ub, platform, false);}, "wrong or absent architecture EFI loader rejected");
+                write(loader, "fixture");
+                fs::remove(ur / "usr/bin/sudo");
+                rejects([&] {validate_reference(ur, ub, platform, false);}, "minimal reference without sudo rejected before recovery");
+            }
+        }
         std::cout << checks << " C++ checks passed\n"; return 0;
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }

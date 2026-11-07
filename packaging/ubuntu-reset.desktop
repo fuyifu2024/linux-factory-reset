@@ -1,11 +1,11 @@
 [Desktop Entry]
 Type=Application
-Name=Ubuntu Factory Reset
-Name[zh_CN]=Ubuntu 恢复出厂设置
+Name=Ubuntu / Debian Factory Reset
+Name[zh_CN]=Ubuntu / Debian 恢复出厂设置
 Comment=Download verified recovery data and restore the initial system
 Comment[zh_CN]=下载并校验恢复资料，删除全部用户并还原初始系统
 Exec=ubuntu-reset gui
 Icon=ubuntu-reset
 Terminal=true
 Categories=System;Settings;
-Keywords=reset;factory;recovery;恢复;出厂;
+Keywords=reset;factory;recovery;Debian;Ubuntu;ARM64;恢复;出厂;

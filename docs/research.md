@@ -17,3 +17,10 @@
 - [Linux firmware-attributes ABI](https://github.com/torvalds/linux/blob/master/Documentation/ABI/testing/sysfs-class-firmware-attributes)：受支持设备的 `reset_bios` 接口、`factory` 值及重启要求；接口并非每台主板都有。
 - [fwupd BIOS 设置文档](https://github.com/fwupd/fwupd/blob/main/docs/bios-settings.md)：内核仅暴露平台支持的设置。
 - [systemd bootctl 文档](https://www.freedesktop.org/software/systemd/man/latest/bootctl.html)：进入固件设置与恢复固件默认值不同。
+
+## Debian / generic ARM64 extension
+
+- [Debian UEFI documentation](https://wiki.debian.org/UEFI): Debian UEFI support includes arm64 and amd64. A CPU architecture alone does not specify every board's boot chain; native U-Boot and other firmware layouts need explicit support.
+- [Debian Reference, system initialization](https://www.debian.org/doc/manuals/debian-reference/ch03.en.html): standard Debian UEFI uses `EFI/debian/grub.cfg` to find `/boot/grub/grub.cfg` by UUID.
+- [Debian GRUB installer source](https://sources.debian.org/src/grub2/2.12-9%2Bdeb13u2/util/grub-install.c/): ARM64 and x86_64 EFI suffixes are `aa64` and `x64` respectively.
+- [Debian 12 libssl3](https://packages.debian.org/bookworm/libssl3) and [Debian 13 libssl3t64](https://packages.debian.org/trixie/libssl3t64): package runtime dependencies must be derived from the actual build distro instead of hardcoding Ubuntu's library package names.

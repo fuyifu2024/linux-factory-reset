@@ -15,3 +15,11 @@
 GitHub CI 分别在 Ubuntu 24.04 x86_64 和 ARM64 上构建、运行相同安全测试并产生二进制及 DEB。CI 的结果不代表真实硬件恢复已通过验收；请以 [Actions](https://github.com/fuyifu2024/ubuntu-reset/actions) 中对应提交的结果为准。
 
 整个开发过程中没有在当前工作机器上安装本工具、设置待恢复标记、修改启动文件、执行系统恢复或 BIOS 重置。
+
+## v0.2.0-alpha.1 / Debian and generic ARM64
+
+新增检查覆盖发行版解析、UEFI/原生树莓派的选择、Debian/Ubuntu 与 ARM64/x86_64 恢复资料生成、发行版 EFI 目录、引导指针修改、旧状态兼容与不支持布局拒绝。合成文件树分别生成 Ubuntu 24.04、Debian 12 和 13 的两种 UEFI 架构资料，并实际生成/解开 Squashfs；这些文件树不会执行其中的模拟系统程序。
+
+CI 扩展为 Ubuntu 24.04、Debian 12、Debian 13 × amd64/ARM64 六组容器，除编译/测试/打包外，还在各容器实际安装 DEB，检查版本、状态、配套脚本和未设置恢复标记。OpenSSL 依赖按各容器的发行版自动计算。它是隔离容器中的安装测试，**不是 UEFI VM 启动/恢复测试**。源/目标恢复、固件和首次开户的真机限制仍与上文一致。
+
+New checks cover distro identification, generic ARM64 UEFI selection, distro/CPU-aware profile creation, EFI relocation, legacy state compatibility and rejection of unsupported layouts. CI spans six distro/architecture combinations and installs packages only inside disposable containers without arming reset. Container and directory-fixture tests do not validate hardware reboot, initial setup, BIOS defaults or power-loss recovery.

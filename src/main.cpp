@@ -7,12 +7,13 @@
 #include <unistd.h>
 
 static void help() {
-    std::cout << "Ubuntu Reset " << uf::VERSION << " (C++20, experimental)\n"
+    std::cout << "Ubuntu / Debian Reset " << uf::VERSION << " (C++20, experimental)\n"
         "  ubuntu-reset gui [--preview]\n"
         "  ubuntu-reset status\n"
         "  sudo ubuntu-reset prepare-pi --release 26.04.1 --storage /mnt/recovery\n"
         "  sudo ubuntu-reset prepare-profile --url https://host/factory.squashfs --sha256 HASH --storage /mnt/recovery\n"
         "  sudo ubuntu-reset make-profile --root /mnt/pristine --boot /mnt/pristine-boot --platform x86_64-uefi --output /mnt/factory.squashfs\n"
+        "  # --platform arm64-uefi supports generic ARM64 UEFI/GRUB devices, including Debian\n"
         "  sudo ubuntu-reset plan\n"
         "  sudo ubuntu-reset arm --confirm ERASE-ALL-USERS [--reboot]\n"
         "  sudo ubuntu-reset cancel\n"

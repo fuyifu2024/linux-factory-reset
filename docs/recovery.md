@@ -29,6 +29,6 @@
 
 ## 审计建议
 
-代码中没有接受任意命令的 root 后门、自动下载并运行脚本、EFI 变量清空或泛化的 `rm -rf /`。执行外部程序使用 argv 数组。主要路径为：`src/system.cpp` 准备与授权、`boot/local-bottom` 离线检查、`boot/reconcile.sh` 文件恢复。
+代码中没有接受任意命令的 root 后门、自动下载并运行脚本、EFI 变量清空或泛化的 `rm -rf /`。执行外部程序使用 argv 数组。主要路径为：`src/system.cpp` 准备与授权、`boot/local-bottom` 离线检查、`boot/reconcile.sh` 文件恢复、`boot/relocate.sh` 按 Debian/Ubuntu 和 ARM64/x86_64 定位引导指针。
 
-安装时 hook 处于休眠状态，没有 boot.conf 时不会加入执行资料。软件包安装不执行 update-initramfs，不设置标记，不重启。删除包前应先取消待恢复操作；已经生成的 initramfs 仍可能含旧脚本，需要按 Ubuntu 管理方式更新 initramfs 才彻底移除。
+安装时 hook 处于休眠状态，没有 boot.conf 时不会加入执行资料。本包没有执行 update-initramfs、设置标记或重启的安装脚本；安装发行版依赖可能触发其正常维护操作。删除包前应先取消待恢复操作；已经生成的 initramfs 仍可能含旧脚本，需要按 Debian/Ubuntu 管理方式更新 initramfs 才彻底移除。

@@ -26,12 +26,14 @@ static json filesystem(const fs::path& p) {
 static std::string machine() { struct utsname u{}; need(uname(&u) == 0, "uname failed"); return u.machine; }
 static std::string kernel() { struct utsname u{}; need(uname(&u) == 0, "uname failed"); return u.release; }
 json hardware() {
-    std::string kind, boot;
-    if (machine() == "aarch64" && fs::exists("/proc/device-tree/model") && read("/proc/device-tree/model").find("Raspberry Pi 5") != std::string::npos) {
-        kind = "raspi-arm64"; boot = "/boot/firmware";
-    } else if (machine() == "x86_64" && fs::exists("/sys/firmware/efi")) {
-        kind = "x86_64-uefi"; boot = "/boot/efi";
-    } else throw Error("Supported targets: Raspberry Pi 5 or x86_64 UEFI Ubuntu");
+    auto os = distribution(read("/usr/lib/os-release"));
+    auto model = fs::exists("/proc/device-tree/model") ? read("/proc/device-tree/model") : "";
+    auto kind = select_platform(machine(), fs::exists("/sys/firmware/efi"), model, os.at("id"));
+    std::string boot = kind == "raspi-arm64" ? "/boot/firmware" : "/boot/efi";
+    if (kind != "raspi-arm64") {
+        need(fs::is_regular_file(efi_directory(boot, os.at("id")) / "grub.cfg") && fs::is_regular_file("/boot/grub/grub.cfg"),
+             "Target must use its distribution's standard GRUB + EFI vendor-directory layout");
+    }
     auto root = filesystem("/"); auto fw = filesystem(boot);
     need(root["fstype"] == "ext4" && fw["fstype"] == "vfat" && root["target"] == "/" && fw["target"] == boot,
          "Requires ordinary ext4 root + separate FAT firmware/EFI partition");
@@ -42,7 +44,7 @@ json hardware() {
         if (src.starts_with("/dev/") && m.at("fstype") != "squashfs")
             need(target == "/" || target == boot || target.starts_with("/media/") || target.starts_with("/mnt/") || target.starts_with("/run/"), "Unsupported additional system/data mount: " + target);
     }
-    return {{"platform", kind}, {"root", root}, {"boot", fw}};
+    return {{"platform", kind}, {"distro", os.at("id")}, {"version_id", os.at("version_id")}, {"root", root}, {"boot", fw}};
 }
 struct Storage {
     fs::path work; json fsinfo; json hw;
@@ -75,9 +77,10 @@ static void download(const std::string& url, const fs::path& dest, const std::st
     } catch (...) { std::error_code ec; fs::remove(partial, ec); throw; }
 }
 static json reference(const fs::path& root, const fs::path& boot, const std::string& kind, bool prepared) {
-    need(kind == "raspi-arm64" || kind == "x86_64-uefi", "Unsupported platform");
-    need(fs::is_regular_file(root / "usr/lib/os-release"), "Reference is not an installed Ubuntu filesystem");
-    need(std::regex_search(read(root / "usr/lib/os-release"), std::regex("(^|\n)ID=\"?ubuntu\"?(\n|$)")), "Only Ubuntu profiles are supported");
+    need(supported_platform(kind), "Unsupported platform");
+    need(fs::is_regular_file(root / "usr/lib/os-release"), "Reference is not an installed Debian/Ubuntu filesystem");
+    auto os = distribution(read(root / "usr/lib/os-release"));
+    need(kind != "raspi-arm64" || os.at("id") == "ubuntu", "Native Pi firmware adapter currently requires Ubuntu; Debian ARM64 uses UEFI+GRUB");
     for (const auto& name : {"etc/passwd", "etc/shadow", "etc/fstab", "var/lib/dpkg/status"})
         need(fs::is_regular_file(root / name) && !fs::is_symlink(root / name), "Missing installed-system reference file: " + std::string(name));
     std::istringstream passwd(read(root / "etc/passwd")); std::string line;
@@ -98,7 +101,7 @@ static json reference(const fs::path& root, const fs::path& boot, const std::str
     need(elf.size() >= 20 && elf.substr(0, 4) == std::string("\177ELF", 4) && elf[4] == 2 && elf[5] == 1,
          "Reference must contain a 64-bit little-endian installed bash binary");
     unsigned arch = static_cast<unsigned char>(elf[18]) | (static_cast<unsigned>(static_cast<unsigned char>(elf[19])) << 8);
-    need(arch == (kind == "raspi-arm64" ? 183U : 62U), "Reference CPU architecture does not match profile platform");
+    need(arch == (kind == "x86_64-uefi" ? 62U : 183U), "Reference CPU architecture does not match profile platform");
     if (kind == "raspi-arm64") {
         need(fs::is_regular_file(boot / "config.txt"), "Missing Pi firmware config.txt"); bool cmdline = false, modules = false;
         need(fs::is_regular_file(boot / "current/vmlinuz") && fs::is_regular_file(boot / "current/initrd.img"), "Missing standard Ubuntu Pi current/ kernel and initrd");
@@ -107,17 +110,27 @@ static json reference(const fs::path& root, const fs::path& boot, const std::str
             if (fs::is_directory(base)) for (const auto& e : fs::directory_iterator(base)) if (str(e.path().filename()).find("raspi") != std::string::npos) modules = true;
         need(cmdline && modules, "Missing Pi command line or kernel modules");
     } else {
-        need(fs::is_regular_file(root / "boot/grub/grub.cfg") && fs::is_regular_file(boot / "EFI/ubuntu/grub.cfg"), "Only standard installed Ubuntu GRUB/EFI layout is supported");
-        need(fs::is_regular_file(boot / "EFI/ubuntu/shimx64.efi") && fs::is_regular_file(boot / "EFI/ubuntu/grubx64.efi"), "Missing Ubuntu EFI binaries");
-        if (prepared) need(fs::is_regular_file(root / "var/lib/ubuntu-reset-firstboot-ready") && fs::is_regular_file(root / "usr/lib/ubuntu-reset/firstboot.sh"), "x86 profile is missing the initial-user setup flow");
+        auto efi = efi_directory(boot, os.at("id"));
+        auto suffix = kind == "arm64-uefi" ? "aa64" : "x64";
+        need(fs::is_regular_file(root / "boot/grub/grub.cfg") && fs::is_regular_file(efi / "grub.cfg"), "Requires standard installed GRUB + distribution EFI pointer");
+        need(fs::is_regular_file(efi / (std::string("grub") + suffix + ".efi")), "Missing architecture-specific GRUB EFI binary");
+        // An unsigned GRUB installation is valid when Secure Boot is disabled.
+        // If shim is used, its presence/validity remains the trusted profile producer's responsibility.
+        for (const auto& name : {"usr/bin/sudo", "usr/bin/passwd", "usr/sbin/useradd", "usr/sbin/usermod"})
+            need(fs::is_regular_file(root / name), "UEFI first-user setup requires sudo/passwd account tools: " + std::string(name));
+        need(std::regex_search(read(root / "etc/group"), std::regex("(^|\n)sudo:[^:]*:[0-9]+:")), "Reference must contain the sudo administrator group");
+        if (prepared) need(fs::is_regular_file(root / "var/lib/ubuntu-reset-firstboot-ready") && fs::is_regular_file(root / "usr/lib/ubuntu-reset/firstboot.sh"), "UEFI profile is missing the initial-user setup flow");
     }
-    return {{"schema", 1}, {"platform", kind}};
+    return {{"schema", 2}, {"platform", kind}, {"distro", os.at("id")}, {"version_id", os.at("version_id")}};
+}
+void validate_reference(const fs::path& root, const fs::path& boot, const std::string& kind, bool prepared) {
+    reference(root, boot, kind, prepared);
 }
 static void replace_all(std::string& text, const std::string& from, const std::string& to) {
     need(!from.empty(), "Cannot replace empty text"); size_t i = 0;
     while ((i = text.find(from, i)) != std::string::npos) { text.replace(i, from.size(), to); i += to.size(); }
 }
-void make_profile(const fs::path& root, const fs::path& boot, const std::string& kind, const fs::path& dest, const json& provenance) {
+void make_profile(const fs::path& root, const fs::path& boot, const std::string& kind, const fs::path& dest, const json& provenance, const fs::path& firstboot_assets) {
     auto meta = reference(root, boot, kind, false); need(!fs::exists(dest), "Destination already exists");
     auto size = std::stoull(output({"du", "-sx", "--block-size=1", str(root)}));
     need(fs::space(dest.parent_path()).available > size * 2 + (1ULL << 30), "Need space for staging plus compressed recovery data");
@@ -146,14 +159,17 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
             write(e.path(), std::regex_replace(text, std::regex("\\broot=\\S+"), "root=UUID=@ROOT_UUID@"));
         }
     } else {
-        need(valid_uuid(old_uuid), "x86 reference must use a root UUID in fstab");
-        for (const auto& p : {r / "boot/grub/grub.cfg", b / "EFI/ubuntu/grub.cfg"}) {
-            need(!fs::is_symlink(p), "Unsafe GRUB config symlink"); auto text = read(p); replace_all(text, old_uuid, "@ROOT_UUID@"); write(p, text);
+        need(valid_uuid(old_uuid), "UEFI reference must use a root UUID in fstab");
+        for (const auto& p : {r / "boot/grub/grub.cfg", efi_directory(b, meta.at("distro")) / "grub.cfg"}) {
+            need(!fs::is_symlink(p), "Unsafe GRUB config symlink"); auto text = read(p);
+            need(text.find(old_uuid) != std::string::npos, "Standard GRUB configs must reference the root UUID; embedded/custom layouts are unsupported");
+            replace_all(text, old_uuid, "@ROOT_UUID@"); write(p, text);
         }
-        // A fresh x86 profile uses our local-console first-user wizard.
+        // Both x86_64 and generic ARM64 UEFI use the local-console first-user wizard.
         fs::create_directories(r / "usr/lib/ubuntu-reset"); fs::create_directories(r / "etc/systemd/system/multi-user.target.wants");
-        fs::copy_file("/usr/lib/ubuntu-reset/firstboot.sh", r / "usr/lib/ubuntu-reset/firstboot.sh", fs::copy_options::overwrite_existing);
-        fs::copy_file("/usr/lib/ubuntu-reset/ubuntu-reset-firstboot.service", r / "etc/systemd/system/ubuntu-reset-firstboot.service", fs::copy_options::overwrite_existing);
+        fs::copy_file(firstboot_assets / "firstboot.sh", r / "usr/lib/ubuntu-reset/firstboot.sh", fs::copy_options::overwrite_existing);
+        fs::permissions(r / "usr/lib/ubuntu-reset/firstboot.sh", fs::perms::owner_all | fs::perms::group_read | fs::perms::group_exec | fs::perms::others_read | fs::perms::others_exec);
+        fs::copy_file(firstboot_assets / "ubuntu-reset-firstboot.service", r / "etc/systemd/system/ubuntu-reset-firstboot.service", fs::copy_options::overwrite_existing);
         fs::create_directories(r / "etc/systemd/system/display-manager.service.d");
         write(r / "etc/systemd/system/display-manager.service.d/ubuntu-reset-firstboot.conf",
               "[Unit]\nRequires=ubuntu-reset-firstboot.service\nAfter=ubuntu-reset-firstboot.service\n");
@@ -170,7 +186,7 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
 static void register_profile(const fs::path& profile, const Storage& st, const json& provenance) {
     no_pending(); auto id = random_id(); auto final = st.work / ("factory-" + id + ".squashfs");
     fs::rename(profile, final); fs::permissions(final, fs::perms::owner_read | fs::perms::owner_write);
-    json state{{"schema", 1}, {"id", id}, {"platform", st.hw["platform"]}, {"root_uuid", st.hw["root"]["uuid"]},
+    json state{{"schema", 2}, {"distro", st.hw["distro"]}, {"version_id", st.hw["version_id"]}, {"id", id}, {"platform", st.hw["platform"]}, {"root_uuid", st.hw["root"]["uuid"]},
                {"boot_uuid", st.hw["boot"]["uuid"]}, {"store_uuid", st.fsinfo["uuid"]}, {"file", "ubuntu-reset/" + str(final.filename())},
                {"sha256", sha256(final)}, {"provenance", provenance}};
     validate_state(state); atomic_write(STATE, state.dump(2) + "\n", 0644);
@@ -223,15 +239,17 @@ void prepare_profile(const std::string& url, const std::string& sum, const fs::p
     auto profile = st.work / ("download-" + sum + ".squashfs"); download(url, profile, sum);
     {
         Mount source(profile, "squashfs", "ro,loop,nosuid,nodev,noexec"); auto meta = json::parse(read(source.temp.path / "profile.json"));
-        need(meta.at("schema") == 1 && meta.at("platform") == st.hw["platform"], "Profile platform does not match target");
-        reference(source.temp.path / "root", source.temp.path / "boot", st.hw["platform"], true);
+        need((meta.at("schema") == 1 || meta.at("schema") == 2) && meta.at("platform") == st.hw["platform"], "Profile platform does not match target");
+        auto actual = reference(source.temp.path / "root", source.temp.path / "boot", st.hw["platform"], true);
+        need(actual.at("distro") == st.hw.at("distro"), "Recovery source must match the running distribution; cross-distribution replacement is unsupported");
+        need(meta.at("schema") == 2 ? meta.at("distro") == actual.at("distro") : actual.at("distro") == "ubuntu", "Profile metadata does not match its root distribution");
         need(read(source.temp.path / "root/etc/fstab").find("@ROOT_UUID@") != std::string::npos, "Factory profile is not relocatable");
     }
     register_profile(profile, st, {{"url", url}, {"sha256", sum}});
 }
 fs::path preflight(const json& s) {
     validate_state(s); auto hw = hardware();
-    need(hw["platform"] == s["platform"] && hw["root"]["uuid"] == s["root_uuid"] && hw["boot"]["uuid"] == s["boot_uuid"], "Target layout changed; prepare a new recovery profile");
+    need(hw["platform"] == s["platform"] && hw.at("distro").get<std::string>() == state_distro(s) && hw["root"]["uuid"] == s["root_uuid"] && hw["boot"]["uuid"] == s["boot_uuid"], "Target layout/distribution changed; prepare a new recovery profile");
     auto mounts = json::parse(output({"findmnt", "--json", "--source", "UUID=" + s.at("store_uuid").get<std::string>(), "-o", "TARGET"}));
     need(mounts.at("filesystems").size() == 1, "Mount the prepared recovery partition first");
     auto path = fs::path(mounts["filesystems"][0].at("target").get<std::string>()) / s.at("file").get<std::string>();
@@ -251,7 +269,8 @@ void arm(const json& s, const std::string& confirmation, bool reboot) {
     secure("/etc/initramfs-tools/hooks/ubuntu-reset"); secure("/etc/initramfs-tools/scripts/local-bottom/ubuntu-reset");
     atomic_write("/etc/ubuntu-reset/boot.conf", boot_config(s)); auto k = kernel(); run({"update-initramfs", "-u", "-k", k});
     auto initrd = fs::path("/boot") / ("initrd.img-" + k); auto contents = output({"lsinitramfs", str(initrd)});
-    need(contents.find("scripts/local-bottom/ubuntu-reset") != std::string::npos && contents.find("conf/ubuntu-reset.conf") != std::string::npos, "Recovery files are absent from initramfs");
+    need(contents.find("scripts/local-bottom/ubuntu-reset") != std::string::npos && contents.find("conf/ubuntu-reset.conf") != std::string::npos
+         && contents.find("usr/lib/ubuntu-reset/relocate.sh") != std::string::npos, "Recovery files are absent from initramfs");
     if (s["platform"] == "raspi-arm64") {
         auto config = read("/boot/firmware/config.txt");
         need(stock_pi_boot(config), "Unsupported/ambiguous Pi boot recipe");
@@ -275,7 +294,7 @@ json firmware_status() {
         } catch (const Error&) {}
     }
     return {{"supported", machine() == "x86_64" && matches.size() == 1}, {"interfaces", matches},
-            {"note", "BIOS defaults are separate from Ubuntu reset and require hardware support."}};
+            {"note", "BIOS defaults are separate from Debian/Ubuntu reset and require hardware support."}};
 }
 void firmware_reset(const std::string& confirmation) {
     root_only(); need(confirmation == "RESET-BIOS-DEFAULTS", "Requires --confirm RESET-BIOS-DEFAULTS"); auto info = firmware_status();

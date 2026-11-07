@@ -13,7 +13,7 @@ using json = nlohmann::json;
 using Args = std::vector<std::string>;
 struct Error : std::runtime_error { using std::runtime_error::runtime_error; };
 struct Result { int code; std::string text; };
-inline constexpr auto VERSION = "0.1.0-alpha.1";
+inline constexpr auto VERSION = "0.2.0-alpha.1";
 inline const fs::path STATE = "/etc/ubuntu-reset/state.json";
 inline const fs::path REQUEST = "/var/lib/ubuntu-reset/request";
 void need(bool condition, const std::string& message);
@@ -37,6 +37,12 @@ std::string signed_checksum(const std::string& sums, const std::string& filename
 std::string relocate(const std::string& input, const std::string& root, const std::string& boot);
 void set_download_proxy(const std::string& value);
 bool stock_pi_boot(const std::string& config);
+bool supported_platform(const std::string& kind);
+json distribution(const std::string& os_release);
+std::string select_platform(const std::string& arch, bool uefi, const std::string& model, const std::string& distro);
+std::string state_distro(const json& state);
+fs::path efi_directory(const fs::path& boot, const std::string& distro);
+void validate_reference(const fs::path& root, const fs::path& boot, const std::string& kind, bool prepared);
 struct TempDir {
     fs::path path;
     explicit TempDir(const fs::path& parent);
@@ -55,7 +61,8 @@ json hardware();
 json firmware_status();
 void firmware_reset(const std::string& confirm);
 void make_profile(const fs::path& root, const fs::path& boot, const std::string& platform,
-                  const fs::path& destination, const json& provenance);
+                  const fs::path& destination, const json& provenance,
+                  const fs::path& firstboot_assets = "/usr/lib/ubuntu-reset");
 void prepare_pi(const std::string& release, const fs::path& storage);
 void prepare_profile(const std::string& url, const std::string& checksum, const fs::path& storage);
 fs::path preflight(const json& state);

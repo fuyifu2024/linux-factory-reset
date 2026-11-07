@@ -6,6 +6,7 @@ case "${1:-}" in prereqs) exit 0 ;; esac
 . /scripts/functions
 . /conf/ubuntu-reset.conf
 . /usr/lib/ubuntu-reset/reconcile.sh
+. /usr/lib/ubuntu-reset/relocate.sh
 UF_TARGET=${rootmnt:-/root}
 [ -e "$UF_TARGET/var/lib/ubuntu-reset/request" ] || exit 0
 
@@ -24,6 +25,8 @@ uf_fail() {
 
 [ "$UF_TARGET" = /root ] || uf_fail 'Unexpected root mount point'
 UF_REQUEST="$UF_TARGET/var/lib/ubuntu-reset/request"
+UF_DISTRO=${UF_DISTRO:-ubuntu}
+case "$UF_DISTRO" in ubuntu|debian) ;; *) uf_fail 'Unknown target distribution' ;; esac
 for component in "$UF_TARGET/var" "$UF_TARGET/var/lib" "$UF_TARGET/var/lib/ubuntu-reset" "$UF_REQUEST"; do
     [ ! -L "$component" ] || uf_fail 'Symlink in reset request path'
 done
@@ -80,19 +83,7 @@ printf 'RESTORING\n' >"$UF_TARGET/var/lib/ubuntu-reset/in-progress" || uf_fail '
 sync
 echo 'Ubuntu Reset: removing users/data and restoring initial system files.' >/dev/console
 uf_reconcile /run/uf-source/root "$UF_TARGET" /run/uf-source/boot /run/uf-boot || uf_fail 'Filesystem restore failed'
-sed -i "s/@ROOT_UUID@/$UF_ROOT/g; s/@BOOT_UUID@/$UF_BOOT/g" "$UF_TARGET/etc/fstab" || uf_fail 'Cannot write target fstab'
-case "$UF_PLATFORM" in
-    raspi-arm64)
-        find /run/uf-boot -type f -name cmdline.txt -exec sed -i "s/@ROOT_UUID@/$UF_ROOT/g" '{}' ';' || uf_fail 'Cannot relocate boot command line'
-        ;;
-    x86_64-uefi)
-        for cfg in "$UF_TARGET/boot/grub/grub.cfg" /run/uf-boot/EFI/ubuntu/grub.cfg; do
-            if [ ! -f "$cfg" ] || [ -L "$cfg" ]; then uf_fail 'Missing standard Ubuntu GRUB pointer'; fi
-            sed -i "s/@ROOT_UUID@/$UF_ROOT/g" "$cfg" || uf_fail 'Cannot relocate GRUB pointer'
-        done
-        ;;
-    *) uf_fail 'Unknown platform' ;;
-esac
+uf_relocate "$UF_PLATFORM" "$UF_DISTRO" "$UF_TARGET" /run/uf-boot "$UF_ROOT" "$UF_BOOT" || uf_fail 'Cannot relocate root/EFI boot pointers'
 sync
 rm -rf "$UF_TARGET/var/lib/ubuntu-reset"
 sync

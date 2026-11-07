@@ -127,9 +127,44 @@ std::string random_id() {
 }
 bool valid_uuid(const std::string& value) { return std::regex_match(value, std::regex("[A-Za-z0-9][A-Za-z0-9-]{3,63}")); }
 bool valid_sha(const std::string& value) { return std::regex_match(value, std::regex("[0-9a-f]{64}")); }
+bool supported_platform(const std::string& kind) {
+    return kind == "raspi-arm64" || kind == "x86_64-uefi" || kind == "arm64-uefi";
+}
+json distribution(const std::string& text) {
+    std::istringstream lines(text); std::map<std::string, std::string> values; std::string line;
+    while (std::getline(lines, line)) {
+        auto equal = line.find('='); if (equal == std::string::npos || line.starts_with("#")) continue;
+        auto key = line.substr(0, equal), value = line.substr(equal + 1);
+        if (!value.empty() && value.back() == '\r') value.pop_back();
+        if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') || (value.front() == '\'' && value.back() == '\''))) value = value.substr(1, value.size() - 2);
+        need(!values.contains(key), "Duplicate os-release key: " + key); values[key] = value;
+    }
+    need(values["ID"] == "ubuntu" || values["ID"] == "debian", "Only Debian and Ubuntu are supported (ID, not ID_LIKE)");
+    return {{"id", values["ID"]}, {"version_id", values["VERSION_ID"]}};
+}
+std::string select_platform(const std::string& arch, bool uefi, const std::string& model, const std::string& distro) {
+    need(distro == "ubuntu" || distro == "debian", "Unsupported target distribution");
+    if ((arch == "aarch64" || arch == "arm64") && uefi) return "arm64-uefi";
+    if (arch == "x86_64" && uefi) return "x86_64-uefi";
+    if (arch == "aarch64" && distro == "ubuntu" && model.find("Raspberry Pi 5") != std::string::npos) return "raspi-arm64";
+    throw Error("Requires ARM64/x86_64 UEFI+GRUB, or the Ubuntu Raspberry Pi 5 firmware adapter; native U-Boot/other board boot flows need a separate adapter");
+}
+std::string state_distro(const json& s) {
+    if (s.at("schema") == 1) return "ubuntu"; // alpha.1 profile/state compatibility.
+    auto id = s.at("distro").get<std::string>();
+    need(id == "ubuntu" || id == "debian", "Invalid profile distribution"); return id;
+}
+fs::path efi_directory(const fs::path& boot, const std::string& distro) {
+    need(distro == "ubuntu" || distro == "debian", "Invalid EFI distributor");
+    return boot / "EFI" / distro;
+}
 void validate_state(const json& s) {
-    need(s.at("schema") == 1, "Unsupported state schema");
-    need(s.at("platform") == "raspi-arm64" || s.at("platform") == "x86_64-uefi", "Unknown platform");
+    need(s.at("schema") == 1 || s.at("schema") == 2, "Unsupported state schema");
+    auto kind = s.at("platform").get<std::string>();
+    need(supported_platform(kind), "Unknown platform");
+    need(s.at("schema") != 1 || kind != "arm64-uefi", "ARM64 UEFI requires schema 2");
+    auto id_distro = state_distro(s);
+    need(kind != "raspi-arm64" || id_distro == "ubuntu", "Native Pi adapter requires an Ubuntu profile");
     for (const auto& key : {"root_uuid", "boot_uuid", "store_uuid"}) need(valid_uuid(s.at(key)), "Invalid filesystem UUID");
     need(s.at("root_uuid") != s.at("boot_uuid") && s.at("root_uuid") != s.at("store_uuid") && s.at("boot_uuid") != s.at("store_uuid"), "Overlapping target and recovery filesystems");
     auto id = s.at("id").get<std::string>();
@@ -142,6 +177,7 @@ std::string boot_config(const json& s) {
     validate_state(s); std::string text;
     for (const auto& [shell, key] : std::map<std::string, std::string>{{"UF_ID", "id"}, {"UF_SHA", "sha256"}, {"UF_STORE", "store_uuid"}, {"UF_ROOT", "root_uuid"}, {"UF_BOOT", "boot_uuid"}, {"UF_FILE", "file"}, {"UF_PLATFORM", "platform"}})
         text += shell + "='" + s.at(key).get<std::string>() + "'\n";
+    text += "UF_DISTRO='" + state_distro(s) + "'\n";
     return text;
 }
 void https(const std::string& url, bool official) {

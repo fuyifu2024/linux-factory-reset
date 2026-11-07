@@ -11,11 +11,18 @@ jobs:
       fail-fast: false
       matrix:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        os:
+          - {image: "ubuntu:24.04", label: "ubuntu24.04"}
+          - {image: "debian:bookworm-slim", label: "debian12"}
+          - {image: "debian:trixie-slim", label: "debian13"}
     runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.os.image }}
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
-      - uses: actions/checkout@v4
       - name: Install build and fixture-test dependencies
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ libssl-dev nlohmann-json3-dev rsync squashfs-tools shellcheck
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates git build-essential cmake libssl-dev nlohmann-json3-dev rsync squashfs-tools shellcheck
+      - uses: actions/checkout@v4
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
       - name: Build
@@ -23,19 +30,29 @@ jobs:
       - name: Tests (temporary directories only)
         run: ctest --test-dir build --output-on-failure
       - name: Shell validation
-        run: shellcheck -e SC1091 boot/hook boot/local-bottom boot/reconcile.sh firstboot/firstboot.sh tests/reconcile.sh
+        run: shellcheck -e SC1091 boot/hook boot/local-bottom boot/reconcile.sh boot/relocate.sh firstboot/firstboot.sh tests/reconcile.sh tests/relocate.sh
       - name: Package
         run: cd build && cpack -G DEB
-      - name: Collect binary and package
+      - name: Install package in disposable container (never arm reset)
+        run: |
+          apt-get install -y --no-install-recommends ./build/*.deb
+          ubuntu-reset --version
+          ubuntu-reset status
+          test ! -e /var/lib/ubuntu-reset/request
+          test ! -e /etc/ubuntu-reset/boot.conf
+          test -f /usr/lib/ubuntu-reset/relocate.sh
+      - name: Collect distro-specific binary and package
+        env:
+          TASK_DISTRO: ${{ matrix.os.label }}
         run: |
           TASK_ARCH=$(dpkg --print-architecture)
           mkdir -p build/release
-          cp build/*.deb build/release/
-          cp build/ubuntu-reset "build/release/ubuntu-reset-linux-$TASK_ARCH"
-          strip "build/release/ubuntu-reset-linux-$TASK_ARCH"
+          cp build/*.deb "build/release/ubuntu-reset_0.2.0-alpha.1_${TASK_DISTRO}_${TASK_ARCH}.deb"
+          cp build/ubuntu-reset "build/release/ubuntu-reset-${TASK_DISTRO}-linux-${TASK_ARCH}"
+          strip "build/release/ubuntu-reset-${TASK_DISTRO}-linux-${TASK_ARCH}"
           cd build/release
-          sha256sum *.deb ubuntu-reset-linux-* > "SHA256SUMS-$TASK_ARCH"
+          sha256sum *.deb ubuntu-reset-*-linux-* > "SHA256SUMS-${TASK_DISTRO}-${TASK_ARCH}"
       - uses: actions/upload-artifact@v4
         with:
-          name: ubuntu-reset-${{ matrix.runner }}
+          name: ubuntu-reset-${{ matrix.os.label }}-${{ matrix.runner }}
           path: build/release/*

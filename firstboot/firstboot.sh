@@ -1,9 +1,9 @@
 #!/bin/bash
-# Runs only in an administrator's clean x86 profile, after factory restore.
+# Runs in a pristine Debian/Ubuntu x86_64 or ARM64 UEFI profile after reset.
 set -euo pipefail
 [[ $EUID -eq 0 ]] || exit 1
 [[ ! -e /var/lib/ubuntu-reset-firstboot-complete ]] || exit 0
-echo 'Ubuntu initial setup / 首次开机设置'
+echo 'Debian / Ubuntu initial setup / 首次开机设置'
 echo 'Create a new local administrator. / 请创建新的本地管理员。'
 if [[ -f /var/lib/ubuntu-reset-firstboot-user ]]; then
     read -r factory_user </var/lib/ubuntu-reset-firstboot-user

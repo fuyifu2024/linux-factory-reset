@@ -1,110 +1,94 @@
-# Ubuntu Reset
+# Ubuntu / Debian Reset
 
-**中文桌面入口 + C++20 主程序 + initramfs 离线恢复脚本。** 目标是让 Ubuntu 自动下载可信的初始系统资料，在重启后清除原用户、个人文件和新增软件，恢复默认系统，无须手工运行安装向导或格式化分区。
+[English](README.en.md) · [发行版 / Releases](https://github.com/fuyifu2024/ubuntu-reset/releases) · [验证记录](docs/validation.md)
 
-> **v0.1.0-alpha.1 是实验版。临时目录中的恢复集成测试已实现；真实树莓派、x86 的重启恢复和首次开机流程尚未验证。请仅在可丢弃的测试系统上验证，不要把它用于唯一的工作系统。**
+**C++20 主程序 + 中文桌面入口 + initramfs 离线恢复脚本。** 下载可信的初始系统资料，重启后删除原用户、个人文件和额外软件，恢复初始环境，不格式化分区、不手动操作安装向导。为兼容旧版，仓库名、命令和包名仍为 `ubuntu-reset`。
 
-## 实际怎么恢复
-
-1. 树莓派模式下载 Ubuntu 官方预装桌面镜像，先验证 `SHA256SUMS.gpg` 的 Ubuntu 签名，再验证镜像 SHA-256。
-2. 从原始系统提取文件、默认配置、初始包数据库和启动文件，生成只读 `factory.squashfs`，保存到**独立 ext4 恢复分区**。
-3. `plan` 使用校验和预览增删改。GUI 中确认“清空全部用户”后，程序生成含恢复脚本的 initramfs，最后才写入待恢复标记。
-4. 下次启动、进入桌面和用户服务之前，核对目标分区 UUID、恢复资料哈希、挂载布局和容量。
-5. 对照原始文件执行恢复：内容相同的文件复用，缺失/被改动的文件修复，多余文件和原用户删除。启动分区也恢复，并写入本机分区 UUID。
-6. 重启进入原始系统的首次设置。树莓派使用原镜像的流程；自建 x86 配置使用本项目的本地控制台创建管理员流程。
-
-**首版第一次仍下载完整原始镜像，然后按文件差异写入；并非只从网络下载差异文件。** 无须提前给当前旧系统做快照。官方原始资料能恢复“该镜像的初始环境”，不能推断一台电脑几年前安装时的全部自定义选择。
-
-恢复会移除原账户、`/home`、`/root` 中的个人文件及系统分区上的额外软件。它不是磁盘安全擦除，未覆盖的数据块可能被恢复。恢复分区保留；其他磁盘不属于清除范围。原始系统中不包含本工具时，本工具也会被移除，之后需重新安装使用。
+> **v0.2.0-alpha.1 是实验版。** 已加入 Debian 和通用 ARM64 UEFI 流程、文件系统测试及跨发行版打包测试；真实硬件的完整重启恢复、首次设置和 BIOS 重置仍未验证。只应在可丢弃的测试系统中验收。
 
 ## 支持范围
 
-| 平台 | 恢复源 | 首版条件 |
+| 系统与平台 | 引导布局 | 恢复源 |
 |---|---|---|
-| Raspberry Pi 5 / ARM64 | 官方 Ubuntu 预装桌面 `.img.xz`，自动下载及验签 | 普通 ext4 根分区、独立 FAT `/boot/firmware`、标准 Ubuntu `current/` 启动配置 |
-| x86_64 / UEFI | 厂商或管理员制作并通过 HTTPS 发布的本项目 `.squashfs` | 普通 ext4 根分区、FAT `/boot/efi`、标准 `EFI/ubuntu/grub.cfg` |
+| Debian 12 / 13，通用 ARM64 | UEFI + GRUB，ext4 `/`、FAT `/boot/efi`、`EFI/debian` | 管理员/厂商制作的匹配设备的可信恢复资料 |
+| Ubuntu，通用 ARM64 | UEFI + GRUB，ext4 `/`、FAT `/boot/efi`、`EFI/ubuntu` | 管理员/厂商制作的匹配设备的可信恢复资料 |
+| Debian / Ubuntu，x86_64 | 同上，使用各自的 EFI 目录及 x64 引导文件 | 管理员/厂商恢复资料 |
+| Ubuntu，树莓派 5 原生固件 | ext4 `/`、FAT `/boot/firmware`，Ubuntu `current/` 布局 | 自动下载、验签官方 Ubuntu 预装桌面镜像 |
 
-**通用 x86 Ubuntu 安装 ISO 的 live 根文件系统不等于已经安装的系统。首版不提供“任意 x86 电脑直接下载 ISO 就恢复”的功能；必须先有可信的、匹配该机型的干净已安装系统配置。** 详见 [制作 x86/OEM 恢复资料](docs/profiles.md)。
+**ARM64 不再等于树莓派。** ARM64 服务器、UEFI 虚拟机、UEFI ARM64 电脑及使用 UEFI/GRUB 的开发板均可走通用 `arm64-uefi` 路径，但仍需符合布局并使用匹配设备的恢复源，不能据此声称所有设备已通过验收。树莓派以 UEFI 启动时也走通用路径。
 
-LUKS、LVM、RAID、Btrfs、独立 `/home`、独立 `/boot`、双系统恢复和自定义引导不在首版范围内，检测到不支持的布局会拒绝继续。额外挂载在 `/mnt`、`/media` 的磁盘不清理。没有真实硬件兼容性保证。
+不直接支持非 UEFI 的 U-Boot/extlinux/裸固件布局、ARM32、LUKS、LVM、RAID、Btrfs、独立 `/home` 或 `/boot`、双系统和自定义引导。Debian 在树莓派原生固件下的其他布局需要专门适配；现有树莓派原生固件适配器用于 Ubuntu。平台检测依据 CPU、UEFI、发行版及实际文件系统布局。
 
-## 安装与构建
+**Debian 和通用 ARM64 的恢复源下载使用 `prepare-profile`，并非自动下载任意安装 ISO。** ISO/live 环境不等于已安装系统，跨 Debian/Ubuntu 替换会被拒绝。恢复资料如何制作见 [profiles.md](docs/profiles.md)。
 
-从 [Releases](https://github.com/fuyifu2024/ubuntu-reset/releases) 下载匹配架构的 `.deb`，使用 `sudo apt install ./文件名.deb` 安装。安装包只安装程序和休眠的 hook，**不会自动准备资料、生成 initramfs、设置恢复标记或重启**。
+## 恢复过程
 
-Releases 同时提供 `ubuntu-reset-linux-arm64` / `ubuntu-reset-linux-amd64` 原生可执行文件和 SHA-256；它们动态链接系统运行库，完整恢复功能建议通过 DEB 安装所需脚本。源码就在本仓库，发行页也可下载源码归档。
+1. 下载官方 Ubuntu Pi 镜像并验证 Ubuntu GPG 签名、SHA-256；或下载你信任的 Debian/Ubuntu `.squashfs` 恢复源并验证独立获得的 SHA-256。
+2. 将完整原始文件参照保存到**独立 ext4 恢复分区**。首次准备仍下载完整资料，不是网络差分下载。
+3. `plan` 只读预览文件增删改。明确确认后，生成恢复 initramfs，最后才写入待恢复标记。
+4. 下次启动，在桌面和用户服务运行之前，验证 UUID、资料哈希、容量、挂载布局，再按文件校验和恢复。内容相同的文件不重写；缺失或改变的文件修复，多余文件和原用户删除。
+5. 按发行版与 CPU 修复引导指针：Debian/Ubuntu 的 `EFI/debian` / `EFI/ubuntu`，ARM64 的 `grubaa64.efi` 或 x86_64 的 `grubx64.efi`。
+6. 重启进入首次设置：通用 UEFI 资料带有本地 tty1 创建管理员的流程；原生 Ubuntu Pi 资料保留官方镜像的流程。
 
-源码构建：
+资料代表所选原始系统，无法推断电脑多年前安装时的全部自定义选择。恢复删除原 `/home` 和 `/root` 数据，但不等于磁盘安全擦除，未覆盖的数据块可能恢复。其他磁盘和恢复分区保留。本工具若不在恢复源中，恢复后也会被移除。
+
+## 下载与安装
+
+[Releases](https://github.com/fuyifu2024/ubuntu-reset/releases) 提供**中英双语说明**、源码归档、ARM64/amd64 原生二进制、DEB 和 SHA-256。请按系统选择 `ubuntu24.04`、`debian12` 或 `debian13`，再按 CPU 选择 `arm64` 或 `amd64`；`ubuntu24.04` 构建也用于满足依赖的更新 Ubuntu 版本。ARM64 二进制适用于对应的 AArch64 运行库，不限定板卡品牌。
+
+```sh
+sudo apt install ./匹配系统与架构的安装包.deb
+ubuntu-reset gui
+```
+
+裸二进制动态链接系统库，完整恢复功能请通过 DEB 安装配套脚本。本包没有自动设置恢复标记、重建 initramfs 或重启的安装脚本；安装依赖本身可能触发发行版正常的维护操作。
+
+## CLI
+
+先自行准备并挂载独立 ext4 恢复分区；程序不创建、不格式化分区。首次准备需要原下载、展开镜像、暂存及压缩资料的空间，建议恢复介质 64 GB 或更大，仍以容量检查为准。
+
+```sh
+# Debian / Ubuntu：匹配本机发行版和 ARM64/x86_64 的可信已安装系统恢复源
+sudo ubuntu-reset prepare-profile \
+  --url https://your-trusted-server.example/factory.squashfs \
+  --sha256 YOUR_INDEPENDENTLY_TRUSTED_SHA256 \
+  --storage /mnt/recovery
+
+# 仅 Ubuntu 树莓派 5 原生固件模式：自动获取官方预装镜像
+sudo ubuntu-reset prepare-pi --release 26.04.1 --storage /mnt/recovery
+
+ubuntu-reset status
+sudo ubuntu-reset plan
+
+# 在可丢弃的测试系统中，确认准备清空全部用户后执行；默认不立即重启
+sudo ubuntu-reset arm --confirm ERASE-ALL-USERS
+sudo ubuntu-reset cancel  # 重启前可取消
+```
+
+GUI 最终确认后使用 `arm --confirm ERASE-ALL-USERS --reboot`。恢复介质必须保持连接。下载受限时可增加 `--proxy http://127.0.0.1:端口` 或 `--proxy socks5h://127.0.0.1:端口`，不关闭 TLS/签名/哈希检查。
+
+## 构建与测试
+
+Debian 12、13 和 Ubuntu 可使用：
 
 ```sh
 sudo apt install build-essential cmake libssl-dev nlohmann-json3-dev \
-  rsync squashfs-tools curl gpgv ubuntu-keyring xz-utils util-linux \
+  rsync squashfs-tools curl gpgv xz-utils util-linux findutils udev \
   initramfs-tools zenity pkexec
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
 cmake --build build -j2
 ctest --test-dir build --output-on-failure
-cd build
-cpack -G DEB
+(cd build && cpack -G DEB)
 ```
 
-构建产物的主程序没有 Python 依赖。主程序用 C++20，界面对话框调用 Zenity，恢复和首次设置只使用 Shell 与系统工具。
+原生 Ubuntu Pi 的官方验签另需 Ubuntu keyring。Debian 的通用恢复流程不依赖 `ubuntu-keyring`；OpenSSL 运行库包名由各发行版构建环境自动解析。主程序及恢复流程无 Python 依赖。
 
-## 使用
+CI 在 Ubuntu 24.04、Debian 12、Debian 13 容器中分别进行 ARM64 和 amd64 构建、测试、打包及非破坏性安装检查。它们验证软件/打包行为，不代表真实硬件恢复已验收。
 
-应用菜单打开 **Ubuntu 恢复出厂设置**，或运行：
+## 固件及故障边界
 
-```sh
-ubuntu-reset gui
-```
+`ubuntu-reset firmware-status` 检查 x86 主板是否提供明确的 `reset_bios/factory` 接口。只有支持时，独立命令 `sudo ubuntu-reset reset-firmware --confirm RESET-BIOS-DEFAULTS` 才可请求默认值，需重启后核实；不会自动随系统还原执行，不删除 EFI 变量或 Secure Boot 密钥。
 
-以下是测试环境中的 CLI 流程。先自行准备并挂载独立 ext4 恢复分区；本工具不创建、不格式化分区。准备过程峰值空间包含压缩下载、展开镜像、文件暂存及生成的恢复资料，建议使用 **64 GB 或更大的恢复介质**，实际仍由容量检查决定。
+下载、验签或准备失败不会设置恢复标记。离线恢复中途失败会停在救援环境/停止状态。**恢复不是跨分区事务，断电可能损坏系统及引导，需要独立救援介质。** 见 [恢复设计](docs/recovery.md) 与 [验证边界](docs/validation.md)。
 
-```sh
-# 下载、验签、建立树莓派恢复资料；尚不清除当前系统
-sudo ubuntu-reset prepare-pi --release 26.04.1 --storage /mnt/recovery
-
-# 查看准备状态和只读增删改清单
-ubuntu-reset status
-sudo ubuntu-reset plan
-
-# 仅当你确实准备清除测试系统时执行；默认不立即重启
-sudo ubuntu-reset arm --confirm ERASE-ALL-USERS
-
-# 重启之前可以取消
-sudo ubuntu-reset cancel
-```
-
-GUI 确认恢复后会使用 `arm --confirm ERASE-ALL-USERS --reboot`，即准备完成后自动重启。恢复介质必须保持连接。再次准备不会自动删除旧的恢复资料，管理员需自行管理磁盘空间。
-
-下载站直连受限时，CLI 准备命令可显式增加 `--proxy http://127.0.0.1:端口` 或 `--proxy socks5h://127.0.0.1:端口`，使用你已有的本地代理。它不会关闭 TLS/签名/哈希校验，不接受代理密码，也不会改系统网络配置。
-
-## UEFI / BIOS
-
-系统还原和 BIOS 默认值是独立功能。仅在 x86 内核明确提供单个支持 `factory` 的 `reset_bios` 接口时，程序允许请求默认设置：
-
-```sh
-ubuntu-reset firmware-status
-sudo ubuntu-reset reset-firmware --confirm RESET-BIOS-DEFAULTS
-```
-
-该命令独立确认，不自动重启、不随系统恢复隐式执行，不删除 EFI 变量或 Secure Boot 密钥。固件密码、主板实现及重启后的实际应用结果由固件决定；需在固件设置中核实。不支持时请使用厂商的设置界面。`systemctl reboot --firmware-setup` 仅进入设置界面，不代表重置。
-
-## 验证与故障处理
-
-测试覆盖哈希、下载地址、签名清单解析、路径/UUID 注入拦截、恢复源个人账户拦截、原始资料生成、账户/数据删除、默认文件修复、保留相同文件、恶意目录链接和失败返回。所有恢复集成测试只操作临时目录。
-
-已执行与尚未执行的验证逐项记录在 [验证记录](docs/validation.md)。
-
-校验失败、下载失败或准备失败不会设置恢复标记。离线恢复开始后发生错误，会停留在 initramfs 救援环境，不启动恢复到一半的系统。恢复不是跨文件系统事务；断电可能损坏系统/启动分区，尤其启动文件替换期间，需要独立救援介质。具体人工恢复方法见 [恢复设计和故障边界](docs/recovery.md)。
-
-## 同类项目与设计依据
-
-先做了 GitHub 同类项目检索，再实现本项目：
-
-- [Resetter](https://github.com/gaining/Resetter)：目标相近，已归档，作者停止维护。
-- [Timeshift](https://github.com/linuxmint/timeshift)：维护中的系统快照恢复工具，默认侧重保留个人文件。
-- [Snapper](https://github.com/openSUSE/snapper)：文件系统快照管理、比较与撤销更改。
-
-本项目独立实现，未复制这些项目的代码，也不依赖 Timeshift。参考来源和研究结果见 [调研记录](docs/research.md)。
-
-MIT License。本项目不是 Canonical 官方产品，不代表 Ubuntu 的支持承诺。
+本项目先调研了 [Resetter](https://github.com/gaining/Resetter)、[Timeshift](https://github.com/linuxmint/timeshift)、[Snapper](https://github.com/openSUSE/snapper)，然后独立实现，未复制其源码。来源见 [调研记录](docs/research.md)。MIT License；非 Canonical 或 Debian 官方产品。
