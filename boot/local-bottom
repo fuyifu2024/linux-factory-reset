@@ -38,7 +38,9 @@ uf_device() {
 }
 UF_ROOT_DEV=$(uf_device "$UF_ROOT") || uf_fail 'Ambiguous/missing target root UUID'
 UF_BOOT_DEV=$(uf_device "$UF_BOOT") || uf_fail 'Ambiguous/missing boot UUID'
-[ "$UF_ROOT" != "$UF_BOOT" ] && [ "$UF_ROOT" != "$UF_STORE" ] && [ "$UF_BOOT" != "$UF_STORE" ] || uf_fail 'Overlapping devices'
+if [ "$UF_ROOT" = "$UF_BOOT" ] || [ "$UF_ROOT" = "$UF_STORE" ] || [ "$UF_BOOT" = "$UF_STORE" ]; then
+    uf_fail 'Overlapping devices'
+fi
 UF_MOUNTED_ROOT=$(awk '$2 == "/root" {print $1}' /proc/mounts)
 [ "$(readlink -f "$UF_MOUNTED_ROOT")" = "$(readlink -f "$UF_ROOT_DEV")" ] || uf_fail 'Running root UUID does not match the target'
 [ "$(blkid -s TYPE -o value "$UF_ROOT_DEV")" = ext4 ] || uf_fail 'Root is not ext4'
@@ -58,11 +60,11 @@ done
 mkdir -p /run/uf-store /run/uf-source /run/uf-boot
 mount -t ext4 -o ro,noload "$UF_STORE_DEV" /run/uf-store || uf_fail 'Cannot mount recovery partition'
 UF_IMAGE="/run/uf-store/$UF_FILE"
-[ -f "$UF_IMAGE" ] && [ ! -L "$UF_IMAGE" ] || uf_fail 'Missing recovery profile'
+if [ ! -f "$UF_IMAGE" ] || [ -L "$UF_IMAGE" ]; then uf_fail 'Missing recovery profile'; fi
 UF_ACTUAL=$(sha256sum "$UF_IMAGE") || uf_fail 'Cannot read recovery profile'
 [ "${UF_ACTUAL%% *}" = "$UF_SHA" ] || uf_fail 'Recovery checksum mismatch'
 mount -t squashfs -o ro,loop "$UF_IMAGE" /run/uf-source || uf_fail 'Cannot mount verified recovery profile'
-[ -f /run/uf-source/root/usr/lib/os-release ] && [ -f /run/uf-source/root/etc/passwd ] || uf_fail 'Invalid root profile'
+if [ ! -f /run/uf-source/root/usr/lib/os-release ] || [ ! -f /run/uf-source/root/etc/passwd ]; then uf_fail 'Invalid root profile'; fi
 grep -q '@ROOT_UUID@' /run/uf-source/root/etc/fstab || uf_fail 'Profile is not relocatable'
 mount -t vfat "$UF_BOOT_DEV" /run/uf-boot || uf_fail 'Cannot mount boot partition'
 
@@ -85,7 +87,7 @@ case "$UF_PLATFORM" in
         ;;
     x86_64-uefi)
         for cfg in "$UF_TARGET/boot/grub/grub.cfg" /run/uf-boot/EFI/ubuntu/grub.cfg; do
-            [ -f "$cfg" ] && [ ! -L "$cfg" ] || uf_fail 'Missing standard Ubuntu GRUB pointer'
+            if [ ! -f "$cfg" ] || [ -L "$cfg" ]; then uf_fail 'Missing standard Ubuntu GRUB pointer'; fi
             sed -i "s/@ROOT_UUID@/$UF_ROOT/g" "$cfg" || uf_fail 'Cannot relocate GRUB pointer'
         done
         ;;
