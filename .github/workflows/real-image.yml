@@ -1,0 +1,22 @@
+name: Validate a real official installed-system image
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies (disposable remote runner)
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libcurl4-openssl-dev nlohmann-json3-dev qemu-utils rsync squashfs-tools
+      - name: Build
+        run: cmake -S . -B build -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr && cmake --build build -j2
+      - name: Download, inspect and validate a real Debian source without booting or arming
+        run: sudo sh tests/real-image.sh "$PWD/build/linux-factory-reset" "$PWD/evidence" "$PWD/firstboot"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-image-evidence
+          path: evidence/*.txt
