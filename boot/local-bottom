@@ -61,7 +61,9 @@ UF_IMAGE="/run/uf-store/$UF_FILE"
 if [ ! -f "$UF_IMAGE" ] || [ -L "$UF_IMAGE" ]; then uf_fail 'Missing recovery profile'; fi
 UF_ACTUAL=$(sha256sum "$UF_IMAGE") || uf_fail 'Cannot read recovery profile'
 [ "${UF_ACTUAL%% *}" = "$UF_SHA" ] || uf_fail 'Recovery checksum mismatch'
-mount -t squashfs -o ro,loop "$UF_IMAGE" /run/uf-source || uf_fail 'Cannot mount verified recovery profile'
+modprobe loop || uf_fail 'Cannot load loop driver'
+UF_LOOP=$(losetup --find --show --read-only "$UF_IMAGE") || uf_fail 'Cannot create read-only recovery loop'
+mount -t squashfs -o ro "$UF_LOOP" /run/uf-source || uf_fail 'Cannot mount verified recovery profile'
 if [ ! -f /run/uf-source/root/usr/lib/os-release ] || [ ! -f /run/uf-source/root/etc/passwd ]; then uf_fail 'Invalid root profile'; fi
 uf_validate_profile "$UF_PLATFORM" "$UF_DISTRO" /run/uf-source/root /run/uf-source/boot || uf_fail 'Profile boot pointers are not safely relocatable'
 mount -t vfat "$UF_BOOT_DEV" /run/uf-boot || uf_fail 'Cannot mount boot partition'
