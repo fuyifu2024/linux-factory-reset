@@ -183,7 +183,19 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
         auto pos = line.find_first_not_of(" \t"); if (pos == std::string::npos || line[pos] == '#') continue;
         std::istringstream f(line); std::string spec, point, type; f >> spec >> point >> type;
         need(point == "/" || point == boot_mount, "Complex fstab/swap layouts are unsupported");
-        if (point == "/") { need(type == "ext4", "Reference root must be ext4"); hasroot = true; if (spec.starts_with("UUID=")) old_uuid = spec.substr(5); }
+        if (point == "/") {
+            need(type == "ext4", "Reference root must be ext4"); hasroot = true;
+            if (spec.starts_with("UUID=")) old_uuid = spec.substr(5);
+            else if (kind != "raspi-arm64" && (spec.starts_with("PARTUUID=") || spec.starts_with("LABEL="))) {
+                // Official installed images commonly use PARTUUID. Resolve it only from
+                // the exact offline root mount, and verify that fstab names that partition.
+                auto mounted = json::parse(output({"findmnt", "--json", "--target", root.string(), "-o", "TARGET,SOURCE,UUID"})).at("filesystems");
+                need(mounted.size() == 1 && fs::canonical(mounted[0].at("target").get<std::string>()) == fs::canonical(root), "Mount the pristine root partition directly to resolve PARTUUID/LABEL safely");
+                auto equal = spec.find('='); auto tag = spec.substr(0, equal);
+                need(output({"blkid", "-s", tag, "-o", "value", mounted[0].at("source")}) == spec.substr(equal+1), "Reference fstab identifies a different root partition");
+                old_uuid = mounted[0].at("uuid").get<std::string>(); need(valid_uuid(old_uuid), "Offline root filesystem has no usable UUID");
+            }
+        }
     }
     need(hasroot, "Missing reference root fstab entry");
     write(r / "etc/fstab", "UUID=@ROOT_UUID@ / ext4 defaults 0 1\nUUID=@BOOT_UUID@ " + std::string(boot_mount) + " vfat defaults 0 2\n");

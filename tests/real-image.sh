@@ -6,7 +6,7 @@ app=$1
 evidence=$2
 assets=$3
 mkdir -p "$evidence"
-work=$(mktemp -d)
+work=$(mktemp -d /var/lib/linux-reset-ci.XXXXXX)
 loop=''
 cleanup() {
     umount "$work/root" 2>/dev/null || :
