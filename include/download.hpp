@@ -14,6 +14,8 @@ struct Cancelled : Error { Cancelled() : Error("下载已取消，未设置恢�
 struct OfficialImage {
     std::string distro, release, edition, arch, filename, url, checksum;
     uint64_t size = 0;
+    std::string format = "iso", checksum_algorithm = "sha256";
+    bool automatic_restore = false;
     json describe() const;
 };
 // Only authenticated HTTPS transport is accepted. Checksum is required for image publication.
@@ -25,6 +27,7 @@ OfficialImage resolve_image(const std::string& distro, const std::string& releas
                             const std::string& arch, const std::string& proxy = "");
 fs::path download_official(const OfficialImage& image, const fs::path& directory,
                           Progress progress = {}, const std::string& proxy = "");
+OfficialImage resolve_recovery(const std::string& distro, const std::string& version, const std::string& platform, const std::string& proxy = "");
 json download_catalog();
 std::string host_arch();
 }

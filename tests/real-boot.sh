@@ -81,7 +81,7 @@ fi
 systemd-run --unit=lfr-qa-observer --property=StandardOutput=tty --property=TTYPath=/dev/ttyS0 /bin/bash -c '
     for ((i=0;i<180;i++)); do
         if test -f /var/lib/ubuntu-reset-firstboot-complete; then
-            if getent passwd lfrqatest && id -nG lfrqatest | grep -qw sudo && passwd -S root | grep -q " L "; then echo LFR_VM_RESTORE_PASS; else echo LFR_VM_NEW_USER_FAIL; fi
+            if getent passwd lfrqatest && id -nG lfrqatest | grep -qw sudo && passwd -S root | grep -q " L "; then sync; echo LFR_VM_RESTORE_PASS; else echo LFR_VM_NEW_USER_FAIL; fi
             systemctl --no-block poweroff; exit
         fi
         sleep 1

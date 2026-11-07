@@ -36,20 +36,22 @@ static std::string hex(const unsigned char* data, size_t length) {
     for (size_t i = 0; i < length; ++i) { value += chars[data[i] >> 4]; value += chars[data[i] & 15]; }
     return value;
 }
-std::string sha256(const fs::path& path, const std::function<void(uint64_t)>& progress) {
+static std::string digest(const fs::path& path, const EVP_MD* algorithm, const std::function<void(uint64_t)>& progress) {
     std::ifstream f(path, std::ios::binary); need(f.good(), "Cannot hash " + path.string());
     std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> ctx(EVP_MD_CTX_new(), EVP_MD_CTX_free);
-    need(ctx && EVP_DigestInit_ex(ctx.get(), EVP_sha256(), nullptr) == 1, "SHA-256 initialization failed");
+    need(ctx && EVP_DigestInit_ex(ctx.get(), algorithm, nullptr) == 1, "Checksum initialization failed");
     std::array<char, 1024 * 1024> buffer{};
     uint64_t processed = 0;
     while (f) { f.read(buffer.data(), buffer.size());
         processed += static_cast<uint64_t>(f.gcount()); if (progress) progress(processed);
-        need(EVP_DigestUpdate(ctx.get(), buffer.data(), static_cast<size_t>(f.gcount())) == 1, "SHA-256 update failed"); }
+        need(EVP_DigestUpdate(ctx.get(), buffer.data(), static_cast<size_t>(f.gcount())) == 1, "Checksum update failed"); }
     need(!f.bad(), "Hash read error");
     unsigned char bytes[EVP_MAX_MD_SIZE]; unsigned size = 0;
-    need(EVP_DigestFinal_ex(ctx.get(), bytes, &size) == 1, "SHA-256 finalization failed");
+    need(EVP_DigestFinal_ex(ctx.get(), bytes, &size) == 1, "Checksum finalization failed");
     return hex(bytes, size);
 }
+std::string sha256(const fs::path& path, const std::function<void(uint64_t)>& progress) { return digest(path, EVP_sha256(), progress); }
+std::string sha512(const fs::path& path, const std::function<void(uint64_t)>& progress) { return digest(path, EVP_sha512(), progress); }
 Result command(const Args& args, bool capture, int stdout_fd, bool desktop, bool merge_errors, bool live_output, uint64_t output_limit) {
     need(!args.empty(), "Empty command");
     fs::path exe;
@@ -202,10 +204,10 @@ std::string image_format(const fs::path& file) {
     throw Error("请选择 IMG、RAW、IMG.XZ、RAW.XZ、QCOW2 或本项目的恢复资料文件；不要选择虚拟磁盘设备。");
 }
 json source_capabilities(const std::string& distro, const std::string& version, const std::string& platform) {
-    bool automatic = distro == "ubuntu" && version == "26.04" && platform == "raspi-arm64";
+    bool automatic = (distro == "ubuntu" && version == "26.04" && platform == "raspi-arm64") || (distro == "debian" && version == "13" && (platform == "x86_64-uefi" || platform == "arm64-uefi"));
     return {{"automatic_available", automatic}, {"distro", distro}, {"version", version}, {"platform", platform},
-            {"automatic_release", automatic ? "26.04.1" : ""},
-            {"reason", automatic ? "可自动选择官方来源并验签，无需填写网址" : "当前设备还没有内置并验证的官方自动恢复源。请选择本地 IMG/RAW 等镜像；无需自建网址。"},
+            {"automatic_release", automatic ? (distro == "debian" ? "13" : "26.04.1") : ""},
+            {"reason", automatic ? (distro == "debian" ? "自动获取 Debian 13 官方基础系统镜像（无桌面），以官网 HTTPS SHA-512 校验。恢复后在控制台创建新用户；不是原桌面软件包的历史副本。" : "可自动选择 Ubuntu 官方来源并验签，无需填写网址") : "当前设备还没有内置并验证的官方自动恢复源。请选择本地 IMG/RAW 等镜像；无需自建网址。"},
             {"iso_automatic_install", false}, {"local_formats", {"img", "raw", "img.xz", "raw.xz", "qcow2", "squashfs"}}};
 }
 fs::path recovery_mount(const fs::path& selected, const json& filesystem, const json& target) {

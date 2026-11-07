@@ -75,7 +75,7 @@ struct DownloadDialog {
         if (now - last < std::chrono::milliseconds(120)) return true;
         last = now;
         auto message = std::to_string(progress.percent()) + "\n# " + progress.text() +
-            (progress.total && progress.downloaded >= progress.total ? "\n# 下载完成，正在校验 SHA-256，请稍候。\n" : "\n");
+            (progress.total && progress.downloaded >= progress.total ? "\n# 下载完成，正在校验镜像，请稍候。\n" : "\n");
         return ::write(input, message.data(), message.size()) == static_cast<ssize_t>(message.size());
     }
     void complete() { const char value[] = "100\n# 校验通过，镜像已保存\n"; (void)::write(input, value, sizeof(value)-1); }
@@ -84,6 +84,18 @@ struct DownloadDialog {
         if (pid > 0) { kill(pid, SIGTERM); int status = 0; while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {} }
     }
 };
+
+static void automatic_preparation(const json& sources, const std::string& storage) {
+    show_text(sources.at("reason").get<std::string>() + "\n\n请选择一个用于暂存下载镜像的目录。下载显示进度和速度；导入完成后会清理临时下载。下一步仍只是准备资料，不会恢复系统。");
+    auto directory = dialog({"--file-selection", "--directory"}); if (directory.empty()) return;
+    TempDir temporary(directory); OfficialImage image;
+    { BusyDialog busy; image = resolve_recovery(sources.at("distro"), sources.at("version"), sources.at("platform")); }
+    fs::path path;
+    { DownloadDialog progress; path = download_official(image, temporary.path, [&](const TransferProgress& p) { return progress.update(p); }); progress.complete(); }
+    privileged({"prepare-image", "--file", path.string(), "--storage", storage,
+        image.checksum_algorithm == "sha512" ? "--sha512" : "--sha256", image.checksum});
+}
+
 static void official_download() {
     auto distro = dialog({"--list", "--width=720", "--height=350", "--column=ID", "--column=官网来源", "--hide-column=1", "--print-column=1",
         "--text=自动从官网取得下载地址及 SHA-256，无需手填网址。\n这里下载的是安装 ISO；ISO 自动恢复尚未实现。Fedora 当前支持下载，恢复引擎尚未支持。",
@@ -157,7 +169,7 @@ int gui(bool preview) {
                 show_text("请选择独立 ext4 恢复磁盘中的任意文件夹，程序会自动识别该磁盘，并在盘内 ubuntu-reset 目录保存资料。\n不能选择当前系统盘里的普通文件夹。虚拟机尚无第二块磁盘时，需要先添加并格式化、挂载它。\n下一步只准备资料，不会恢复系统。镜像需包含干净的已安装系统。ISO 自动安装功能尚未实现。");
                 auto store = dialog({"--file-selection", "--directory"}); if (store.empty()) continue;
                 if (source == "local") privileged({"prepare-image", "--file", image, "--storage", store});
-                else privileged({"prepare-auto", "--storage", store});
+                else automatic_preparation(sources, store);
             } else if (choice == "plan") privileged({"plan"}, true);
             else if (choice == "cancel") privileged({"cancel"});
             else if (choice == "restore") {

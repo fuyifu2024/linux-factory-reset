@@ -18,7 +18,9 @@ trap cleanup EXIT HUP INT TERM
 base=https://cloud.debian.org/images/cloud/trixie/latest/
 curl --fail --location --proto '=https' --proto-redir '=https' --max-filesize 4194304 --output "$work/SHA512SUMS" "${base}SHA512SUMS"
 sleep 6
-filename=debian-13-nocloud-amd64.qcow2
+source_arch=${5:-amd64}
+case "$source_arch" in amd64) platform=x86_64-uefi ;; arm64) platform=arm64-uefi ;; *) exit 1 ;; esac
+filename="debian-13-nocloud-$source_arch.qcow2"
 expected=$(awk -v file="$filename" '$2 == file {print $1}' "$work/SHA512SUMS")
 [ "${#expected}" -eq 128 ] || { echo 'No unambiguous official checksum'; exit 1; }
 printf 'Source: %s%s\nSHA512: %s\nTrust: official HTTPS checksum; detached signature not checked by this probe\n' "$base" "$filename" "$expected" >"$evidence/source.txt"
@@ -46,7 +48,7 @@ done >"$evidence/grub.txt"
 mkdir -p /usr/lib/ubuntu-reset
 cp "$assets/firstboot.sh" "$assets/ubuntu-reset-firstboot.service" /usr/lib/ubuntu-reset/
 set +e
-"$app" make-profile --root "$work/root" --boot "$work/boot" --platform x86_64-uefi --output "$work/profile.squashfs" >"$evidence/profile-validation.txt" 2>&1
+"$app" make-profile --root "$work/root" --boot "$work/boot" --platform "$platform" --output "$work/profile.squashfs" >"$evidence/profile-validation.txt" 2>&1
 result=$?
 set -e
 cat "$evidence/profile-validation.txt"

@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
             {"gui", {"--preview"}}, {"status", {}}, {"sources", {}}, {"firmware-status", {}}, {"plan", {}}, {"cancel", {}},
             {"catalog", {}}, {"resolve", {"--distro", "--release", "--edition", "--arch", "--proxy"}},
             {"download", {"--distro", "--release", "--edition", "--arch", "--directory", "--proxy"}},
-            {"prepare-image", {"--file", "--storage"}}, {"prepare-auto", {"--storage", "--proxy"}},
+            {"prepare-image", {"--file", "--storage", "--sha256", "--sha512"}}, {"prepare-auto", {"--storage", "--proxy"}},
             {"prepare-pi", {"--release", "--storage", "--proxy"}}, {"prepare-profile", {"--url", "--sha256", "--storage", "--proxy"}},
             {"make-profile", {"--root", "--boot", "--platform", "--output"}},
             {"arm", {"--confirm", "--reboot"}}, {"reset-firmware", {"--confirm"}}};
@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
         uf::need(lock >= 0, "Cannot open operation lock"); struct stat st{};
         uf::need(fstat(lock, &st) == 0 && S_ISREG(st.st_mode) && st.st_uid == 0 && !(st.st_mode & 0077), "Unsafe operation lock");
         uf::need(flock(lock, LOCK_EX | LOCK_NB) == 0, "Another Linux Factory Reset operation is active");
-        if (cmd == "prepare-image") uf::prepare_image(get("--file"), get("--storage"));
+        if (cmd == "prepare-image") uf::prepare_image(get("--file"), get("--storage"), options.contains("--sha256") ? get("--sha256") : "", options.contains("--sha512") ? get("--sha512") : "");
         else if (cmd == "prepare-auto") uf::prepare_automatic(get("--storage"));
         else if (cmd == "prepare-pi") uf::prepare_pi(options.contains("--release") ? get("--release") : "26.04.1", get("--storage"));
         else if (cmd == "prepare-profile") uf::prepare_profile(get("--url"), get("--sha256"), get("--storage"));

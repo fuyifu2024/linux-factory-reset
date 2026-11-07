@@ -14,12 +14,13 @@ using json = nlohmann::json;
 using Args = std::vector<std::string>;
 struct Error : std::runtime_error { using std::runtime_error::runtime_error; };
 struct Result { int code; std::string text; };
-inline constexpr auto VERSION = "0.3.0-alpha.1";
+inline constexpr auto VERSION = "0.4.0-alpha.1";
 inline const fs::path STATE = "/etc/ubuntu-reset/state.json";
 inline const fs::path REQUEST = "/var/lib/ubuntu-reset/request";
 void need(bool condition, const std::string& message);
 std::string read(const fs::path& path);
 void write(const fs::path& path, const std::string& data);
+std::string sha512(const fs::path& path, const std::function<void(uint64_t)>& progress = {});
 std::string sha256(const fs::path& path, const std::function<void(uint64_t)>& progress = {});
 Result command(const Args& args, bool capture = true, int stdout_fd = -1, bool desktop = false,
                bool merge_errors = false, bool live_output = false, uint64_t output_limit = 0);
@@ -73,7 +74,7 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
                   const fs::path& firstboot_assets = "/usr/lib/ubuntu-reset");
 void prepare_pi(const std::string& release, const fs::path& storage);
 void prepare_profile(const std::string& url, const std::string& checksum, const fs::path& storage);
-void prepare_image(const fs::path& image, const fs::path& storage);
+void prepare_image(const fs::path& image, const fs::path& storage, const std::string& expected_sha256 = "", const std::string& expected_sha512 = "");
 void prepare_automatic(const fs::path& storage);
 json detected_sources();
 fs::path preflight(const json& state);

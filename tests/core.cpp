@@ -45,7 +45,8 @@ int main() {
         check(image_format("factory.squashfs") == "profile", "local prepared profile classification");
         rejects([] {image_format("installer.iso");}, "installer ISO not falsely treated as installed root");
         rejects([] {image_format("/dev/vda");}, "block device not treated as an image file");
-        check(!source_capabilities("debian", "13", "arm64-uefi").at("automatic_available").get<bool>(), "unimplemented official source not presented as ready");
+        check(source_capabilities("debian", "13", "arm64-uefi").at("automatic_available").get<bool>(), "Debian 13 generic ARM64 source selected automatically");
+        check(!source_capabilities("debian", "12", "arm64-uefi").at("automatic_available").get<bool>(), "unimplemented older source not presented as ready");
         check(source_capabilities("ubuntu", "26.04", "raspi-arm64").at("automatic_available").get<bool>(), "native source selected by detection, not menu branding");
         json volume{{"uuid", "abcd-5678"}, {"target", "/media/recovery"}, {"fstype", "ext4"}, {"options", "rw,relatime"}};
         json target{{"root", {{"uuid", "root-0001"}}}, {"boot", {{"uuid", "boot-0002"}}}};
@@ -82,7 +83,8 @@ int main() {
         require_inside(safe, safe / "lib/new-file"); ++checks;
         write(tmp.path / "hash", "abc");
         check(sha256(tmp.path / "hash") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "SHA256 known vector");
-        check(random_id().size() == 32 && random_id() != random_id(), "random identifiers");
+        check(sha512(tmp.path / "hash") == "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f", "SHA512 known vector");
+        check(random_id(.size() == 32 && random_id() != random_id(), "random identifiers");
         check(valid_uuid("01234567-89ab-cdef-0123-456789abcdef") && valid_uuid("ABCD-1234"), "UUID formats");
         check(!valid_uuid("a';reboot #") && !valid_uuid("../../dev/sda"), "UUID injection rejected");
         auto s = state(); validate_state(s); check(boot_config(s).find("UF_ROOT='1111-2222'") != std::string::npos, "boot config");

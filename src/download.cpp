@@ -9,6 +9,7 @@
 #include <memory>
 #include <regex>
 #include <sstream>
+#include <thread>
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <unistd.h>
@@ -81,10 +82,10 @@ std::string human(double count) {
 void validate(const OfficialImage& i) {
     need(i.distro == "ubuntu" || i.distro == "debian" || i.distro == "fedora", "Unsupported official distribution");
     need(i.arch == "amd64" || i.arch == "arm64", "Unsupported image architecture");
-    need(std::regex_match(i.filename, std::regex("[A-Za-z0-9][A-Za-z0-9.+_-]*\\.iso")), "Unsafe official image filename");
-    need(valid_sha(i.checksum), "官网未提供有效 SHA-256，已停止下载"); https(i.url);
+    need(std::regex_match(i.filename, std::regex("[A-Za-z0-9][A-Za-z0-9.+_-]*\\.(iso|qcow2|img\\.xz)")), "Unsafe official image filename");
+    need((i.checksum_algorithm == "sha256" && valid_sha(i.checksum)) || (i.checksum_algorithm == "sha512" && std::regex_match(i.checksum, std::regex("[0-9a-f]{128}"))), "官网未提供有效校验值，已停止下载"); https(i.url);
     const auto allowed = i.distro == "ubuntu" ? (i.url.starts_with("https://releases.ubuntu.com/") || i.url.starts_with("https://cdimage.ubuntu.com/")) :
-        i.distro == "debian" ? i.url.starts_with("https://cdimage.debian.org/") : i.url.starts_with("https://download.fedoraproject.org/");
+        i.distro == "debian" ? (i.url.starts_with("https://cdimage.debian.org/") || i.url.starts_with("https://cloud.debian.org/images/cloud/")) : i.url.starts_with("https://download.fedoraproject.org/");
     need(allowed, "Image is outside the selected distribution's official source");
     need(i.size <= image_limit, "Official image exceeds 16 GiB limit");
 }
@@ -98,8 +99,8 @@ std::string TransferProgress::text() const {
 }
 json OfficialImage::describe() const {
     return {{"distro", distro}, {"release", release}, {"edition", edition}, {"arch", arch}, {"filename", filename}, {"url", url},
-        {"sha256", checksum}, {"size", size}, {"trust", "SHA-256 from official HTTPS metadata; detached PGP signature not checked in ISO downloader"},
-        {"format", "iso"}, {"automatic_restore", false}};
+        {checksum_algorithm, checksum}, {"size", size}, {"trust", "Checksum from official HTTPS metadata; detached PGP signature not checked by ISO downloader"},
+        {"format", format}, {"automatic_restore", automatic_restore}};
 }
 std::string fetch_metadata(const std::string& url, const std::string& proxy) {
     Transfer t; t.limit = 4ULL << 20; request(url, t, proxy); return t.metadata;
@@ -168,12 +169,39 @@ fs::path download_official(const OfficialImage& image, const fs::path& directory
         request(image.url, t, proxy); need(t.written > 0 && (!image.size || t.written == image.size), "镜像大小与官网记录不符");
         need(fsync(fd) == 0, "Cannot flush downloaded image"); close(fd); fd = -1;
         if (t.callback && !t.callback({t.written, t.written, 0})) throw Cancelled();
-        need(sha256(partial, [&](uint64_t) { if (t.callback && !t.callback({t.written, t.written, 0})) throw Cancelled(); }) == image.checksum, "SHA-256 校验失败，已删除下载临时文件");
+        auto check_cancel = [&](uint64_t) { if (t.callback && !t.callback({t.written, t.written, 0})) throw Cancelled(); };
+        auto hash = image.checksum_algorithm == "sha512" ? sha512(partial, check_cancel) : sha256(partial, check_cancel);
+        if (t.callback && !t.callback({t.written, t.written, 0})) throw Cancelled();
+        need(hash == image.checksum, "镜像校验失败，已删除下载临时文件");
         // Hard-link publication is atomic and refuses to replace an existing destination.
         need(link(partial.c_str(), destination.c_str()) == 0, "无法保存镜像，可能已有同名文件"); fs::remove(partial);
         return destination;
     } catch (...) { if (fd >= 0) close(fd); std::error_code ec; fs::remove(partial, ec); throw; }
 }
+
+OfficialImage resolve_recovery(const std::string& distro, const std::string& version, const std::string& platform, const std::string& proxy) {
+    auto capability = source_capabilities(distro, version, platform); need(capability.at("automatic_available").get<bool>(), capability.at("reason"));
+    if (distro == "debian") {
+        auto arch = platform == "arm64-uefi" ? "arm64" : "amd64";
+        std::string base = "https://cloud.debian.org/images/cloud/trixie/latest/";
+        auto filename = "debian-13-nocloud-" + std::string(arch) + ".qcow2";
+        auto text = fetch_metadata(base + "SHA512SUMS", proxy); std::istringstream lines(text); std::string line, checksum;
+        while (std::getline(lines, line)) if (line.size() >= 131 && line.substr(130) == filename) {
+            need(checksum.empty(), "Ambiguous Debian recovery checksum"); checksum = line.substr(0,128);
+        }
+        OfficialImage image{"debian", "13", "nocloud base system (no desktop)", arch, filename, base + filename, checksum, 0};
+        image.format = "qcow2"; image.checksum_algorithm = "sha512"; image.automatic_restore = true; validate(image); return image;
+    }
+    std::string base = "https://cdimage.ubuntu.com/releases/26.04.1/release/", filename = "ubuntu-26.04.1-preinstalled-desktop-arm64+raspi.img.xz";
+    auto sums = fetch_metadata(base + "SHA256SUMS", proxy);
+    std::this_thread::sleep_for(std::chrono::seconds(6));
+    auto signature = fetch_metadata(base + "SHA256SUMS.gpg", proxy); TempDir temporary("/tmp");
+    write(temporary.path / "sums", sums); write(temporary.path / "signature", signature);
+    run({"gpgv", "--homedir", temporary.path.string(), "--keyring", "/usr/share/keyrings/ubuntu-archive-keyring.gpg", (temporary.path / "signature").string(), (temporary.path / "sums").string()});
+    OfficialImage image{"ubuntu", "26.04.1", "preinstalled desktop", "arm64", filename, base + filename, signed_checksum(sums, filename), 0};
+    image.format = "img.xz"; image.automatic_restore = true; validate(image); return image;
+}
+
 std::string host_arch() { struct utsname u{}; need(uname(&u) == 0, "uname failed"); return std::string(u.machine) == "aarch64" ? "arm64" : std::string(u.machine) == "x86_64" ? "amd64" : "unsupported"; }
 json download_catalog() {
     return {{"host_arch", host_arch()}, {"architectures", {"amd64", "arm64"}}, {"sources", {

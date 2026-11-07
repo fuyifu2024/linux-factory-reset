@@ -8,7 +8,7 @@ let typed = false;
 while (Date.now() < deadline) {
   const log = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf8') : '';
   if (/LFR_VM_(?:PREPARATION_FAIL|OLD_DATA_SURVIVED|NEW_USER_FAIL|SETUP_TIMEOUT)/.test(log)) throw Error('Real VM reported a failed recovery; inspect serial evidence');
-  if (log.includes('LFR_VM_RESTORE_PASS')) { console.log('Real UEFI VM restored, removed old users/data and created a new sudo administrator.'); process.exit(0); }
+  if (log.includes('LFR_VM_RESTORE_PASS')) { await delay(5000); console.log('Real UEFI VM restored, removed old users/data and created a new sudo administrator.'); process.exit(0); }
   if (!typed && log.includes('LFR_VM_AWAITING_NEW_USER')) {
     typed = true;
     const socket = net.createConnection(socketPath);

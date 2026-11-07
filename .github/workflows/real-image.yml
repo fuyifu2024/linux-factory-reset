@@ -1,6 +1,12 @@
 name: Validate a real official installed-system image
 on:
   workflow_dispatch:
+    inputs:
+      architecture:
+        description: Source architecture (ARM64 validates real image without executing an ARM guest)
+        type: choice
+        options: [amd64, arm64]
+        default: amd64
 permissions:
   contents: read
 jobs:
@@ -14,6 +20,7 @@ jobs:
       - name: Build
         run: cmake -S . -B build -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr && cmake --build build -j2
       - name: Build native Debian VM package from the same source
+        if: inputs.architecture != 'arm64'
         run: |
           docker run --rm -v "$PWD:/src" -w /src debian:trixie-slim sh -ec '
             apt-get update
@@ -24,7 +31,14 @@ jobs:
             cpack -G DEB
           '
       - name: Validate a real source, then actually restore an expendable UEFI VM
-        run: sudo env GITHUB_ACTIONS=true sh tests/real-image.sh "$PWD/build/linux-factory-reset" "$PWD/evidence" "$PWD/firstboot" "$PWD"/build-vm/*.deb
+        env:
+          SOURCE_ARCH: ${{ inputs.architecture }}
+        run: |
+          if [ "$SOURCE_ARCH" = arm64 ]; then
+            sudo env GITHUB_ACTIONS=true sh tests/real-image.sh "$PWD/build/linux-factory-reset" "$PWD/evidence" "$PWD/firstboot" "" arm64
+          else
+            sudo env GITHUB_ACTIONS=true sh tests/real-image.sh "$PWD/build/linux-factory-reset" "$PWD/evidence" "$PWD/firstboot" "$PWD"/build-vm/*.deb amd64
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

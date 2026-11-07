@@ -1,4 +1,5 @@
 #include "reset.hpp"
+#include "download.hpp"
 #include <chrono>
 #include <cerrno>
 #include <fcntl.h>
@@ -293,10 +294,14 @@ static void snapshot_local_file(const fs::path& from, const fs::path& to) {
         need(fsync(out) == 0, "镜像暂存写入失败"); close(out); out = -1; close(in);
     } catch (...) { close(in); if (out >= 0) close(out); throw; }
 }
-void prepare_image(const fs::path& selected, const fs::path& location) {
+void prepare_image(const fs::path& selected, const fs::path& location, const std::string& expected_sha256, const std::string& expected_sha512) {
     root_only(); no_pending(); auto format = image_format(selected); Storage st(location); TempDir temp(st.work);
     auto snapshot = temp.path / "input", raw = temp.path / "disk.raw", profile = temp.path / "prepared.squashfs";
+    need(expected_sha256.empty() || valid_sha(expected_sha256), "Invalid expected SHA-256");
+    need(expected_sha512.empty() || std::regex_match(expected_sha512, std::regex("[0-9a-f]{128}")), "Invalid expected SHA-512");
     snapshot_local_file(selected, snapshot);
+    need(expected_sha256.empty() || sha256(snapshot) == expected_sha256, "Official image changed before import (SHA-256 mismatch)");
+    need(expected_sha512.empty() || sha512(snapshot) == expected_sha512, "Official image changed before import (SHA-512 mismatch)");
     json provenance{{"type", "local image"}, {"filename", selected.filename().string()}, {"sha256", sha256(snapshot)}, {"format", format},
                     {"authentication", "User-selected local file; computed hash is integrity tracking, not proof of publisher identity"}};
     if (format == "profile") {
@@ -328,7 +333,12 @@ json detected_sources() {
 }
 void prepare_automatic(const fs::path& location) {
     root_only(); auto sources = detected_sources(); need(sources.at("automatic_available").get<bool>(), sources.at("reason"));
-    prepare_pi(sources.at("automatic_release"), location);
+    std::cout << sources.at("reason").get<std::string>() << std::endl;
+    Storage st(location); TempDir temporary(st.work);
+    auto image = resolve_recovery(st.hw.at("distro"), st.hw.at("version_id"), st.hw.at("platform"), proxy);
+    std::this_thread::sleep_for(std::chrono::seconds(6));
+    auto path = download_official(image, temporary.path, [](const TransferProgress& p) { std::cerr << "\r" << p.percent() << "%  " << p.text() << "       " << std::flush; return true; }, proxy);
+    prepare_image(path, location, image.checksum_algorithm == "sha256" ? image.checksum : "", image.checksum_algorithm == "sha512" ? image.checksum : "");
 }
 void prepare_pi(const std::string& release, const fs::path& location) {
     root_only(); no_pending(); Storage st(location); need(st.hw["platform"] == "raspi-arm64", "Official Pi images are only supported on Raspberry Pi 5");
