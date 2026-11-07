@@ -1,0 +1,98 @@
+#!/bin/sh
+# Runs before switch_root, while no processes from the installed OS are running.
+set -u
+case "${1:-}" in prereqs) exit 0 ;; esac
+[ -f /conf/ubuntu-reset.conf ] || exit 0
+. /scripts/functions
+. /conf/ubuntu-reset.conf
+. /usr/lib/ubuntu-reset/reconcile.sh
+UF_TARGET=${rootmnt:-/root}
+[ -e "$UF_TARGET/var/lib/ubuntu-reset/request" ] || exit 0
+
+uf_fail() {
+    echo "Ubuntu Reset STOPPED: $*" >/dev/console
+    # panic() can return after the rescue shell exits. Never fall through into
+    # booting a partly restored OS, and never reboot in a retry loop.
+    while :; do
+        panic "Ubuntu Reset: $*. Use external recovery media if necessary."
+        sleep 1
+    done
+}
+
+[ "$UF_TARGET" = /root ] || uf_fail 'Unexpected root mount point'
+UF_REQUEST="$UF_TARGET/var/lib/ubuntu-reset/request"
+for component in "$UF_TARGET/var" "$UF_TARGET/var/lib" "$UF_TARGET/var/lib/ubuntu-reset" "$UF_REQUEST"; do
+    [ ! -L "$component" ] || uf_fail 'Symlink in reset request path'
+done
+[ -f "$UF_REQUEST" ] || uf_fail 'Invalid reset request'
+[ "$(stat -c '%u:%a' "$UF_REQUEST")" = '0:600' ] || uf_fail 'Unsafe reset request permissions'
+[ "$(cat "$UF_REQUEST")" = "$UF_ID" ] || uf_fail 'Request does not match the recovery initramfs'
+
+uf_device() {
+    uf_devices=$(blkid -t "UUID=$1" -o device 2>/dev/null) || return 1
+    [ "$(printf '%s\n' "$uf_devices" | wc -l)" -eq 1 ] || return 1
+    printf '%s\n' "$uf_devices"
+}
+UF_ROOT_DEV=$(uf_device "$UF_ROOT") || uf_fail 'Ambiguous/missing target root UUID'
+UF_BOOT_DEV=$(uf_device "$UF_BOOT") || uf_fail 'Ambiguous/missing boot UUID'
+[ "$UF_ROOT" != "$UF_BOOT" ] && [ "$UF_ROOT" != "$UF_STORE" ] && [ "$UF_BOOT" != "$UF_STORE" ] || uf_fail 'Overlapping devices'
+UF_MOUNTED_ROOT=$(awk '$2 == "/root" {print $1}' /proc/mounts)
+[ "$(readlink -f "$UF_MOUNTED_ROOT")" = "$(readlink -f "$UF_ROOT_DEV")" ] || uf_fail 'Running root UUID does not match the target'
+[ "$(blkid -s TYPE -o value "$UF_ROOT_DEV")" = ext4 ] || uf_fail 'Root is not ext4'
+[ "$(blkid -s TYPE -o value "$UF_BOOT_DEV")" = vfat ] || uf_fail 'Boot is not FAT'
+[ -z "$(awk '$2 ~ /^\/root\// {print $2}' /proc/mounts)" ] || uf_fail 'Unexpected mounts inside target root'
+
+echo 'Ubuntu Reset: verifying recovery media; do not remove power.' >/dev/console
+UF_STORE_DEV=''
+uf_tries=0
+while [ "$uf_tries" -lt 30 ]; do
+    UF_STORE_DEV=$(uf_device "$UF_STORE") && break
+    uf_tries=$((uf_tries + 1))
+    sleep 1
+done
+[ -n "$UF_STORE_DEV" ] || uf_fail 'Recovery partition is unavailable'
+[ "$(blkid -s TYPE -o value "$UF_STORE_DEV")" = ext4 ] || uf_fail 'Recovery partition is not ext4'
+mkdir -p /run/uf-store /run/uf-source /run/uf-boot
+mount -t ext4 -o ro,noload "$UF_STORE_DEV" /run/uf-store || uf_fail 'Cannot mount recovery partition'
+UF_IMAGE="/run/uf-store/$UF_FILE"
+[ -f "$UF_IMAGE" ] && [ ! -L "$UF_IMAGE" ] || uf_fail 'Missing recovery profile'
+UF_ACTUAL=$(sha256sum "$UF_IMAGE") || uf_fail 'Cannot read recovery profile'
+[ "${UF_ACTUAL%% *}" = "$UF_SHA" ] || uf_fail 'Recovery checksum mismatch'
+mount -t squashfs -o ro,loop "$UF_IMAGE" /run/uf-source || uf_fail 'Cannot mount verified recovery profile'
+[ -f /run/uf-source/root/usr/lib/os-release ] && [ -f /run/uf-source/root/etc/passwd ] || uf_fail 'Invalid root profile'
+grep -q '@ROOT_UUID@' /run/uf-source/root/etc/fstab || uf_fail 'Profile is not relocatable'
+mount -t vfat "$UF_BOOT_DEV" /run/uf-boot || uf_fail 'Cannot mount boot partition'
+
+# Check capacity before the first deletion. This is not a power-failure transaction.
+uf_root_size=$(du -sk --apparent-size /run/uf-source/root | awk '{print $1}') || uf_fail 'Cannot size profile'
+uf_root_capacity=$(df -Pk "$UF_TARGET" | awk 'END {print $2}')
+uf_boot_size=$(du -sk --apparent-size /run/uf-source/boot | awk '{print $1}') || uf_fail 'Cannot size boot profile'
+uf_boot_capacity=$(df -Pk /run/uf-boot | awk 'END {print $2}')
+[ "$uf_root_capacity" -gt "$((uf_root_size + 262144))" ] || uf_fail 'Root partition too small'
+[ "$uf_boot_capacity" -gt "$((uf_boot_size + 16384))" ] || uf_fail 'Boot partition too small'
+mount -o remount,rw "$UF_TARGET" || uf_fail 'Cannot make target writable'
+printf 'RESTORING\n' >"$UF_TARGET/var/lib/ubuntu-reset/in-progress" || uf_fail 'Cannot record recovery phase'
+sync
+echo 'Ubuntu Reset: removing users/data and restoring initial system files.' >/dev/console
+uf_reconcile /run/uf-source/root "$UF_TARGET" /run/uf-source/boot /run/uf-boot || uf_fail 'Filesystem restore failed'
+sed -i "s/@ROOT_UUID@/$UF_ROOT/g; s/@BOOT_UUID@/$UF_BOOT/g" "$UF_TARGET/etc/fstab" || uf_fail 'Cannot write target fstab'
+case "$UF_PLATFORM" in
+    raspi-arm64)
+        find /run/uf-boot -type f -name cmdline.txt -exec sed -i "s/@ROOT_UUID@/$UF_ROOT/g" '{}' ';' || uf_fail 'Cannot relocate boot command line'
+        ;;
+    x86_64-uefi)
+        for cfg in "$UF_TARGET/boot/grub/grub.cfg" /run/uf-boot/EFI/ubuntu/grub.cfg; do
+            [ -f "$cfg" ] && [ ! -L "$cfg" ] || uf_fail 'Missing standard Ubuntu GRUB pointer'
+            sed -i "s/@ROOT_UUID@/$UF_ROOT/g" "$cfg" || uf_fail 'Cannot relocate GRUB pointer'
+        done
+        ;;
+    *) uf_fail 'Unknown platform' ;;
+esac
+sync
+rm -rf "$UF_TARGET/var/lib/ubuntu-reset"
+sync
+umount /run/uf-boot || uf_fail 'Cannot flush boot filesystem'
+mount -o remount,ro "$UF_TARGET" || uf_fail 'Cannot flush root filesystem'
+echo 'Ubuntu Reset complete. Restarting into initial setup.' >/dev/console
+reboot -f
+uf_fail 'Automatic reboot failed; restart manually'

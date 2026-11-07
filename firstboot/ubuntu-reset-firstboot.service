@@ -1,0 +1,21 @@
+[Unit]
+Description=Create a new administrator after Ubuntu factory reset
+ConditionPathExists=!/var/lib/ubuntu-reset-firstboot-complete
+After=local-fs.target
+Before=display-manager.service getty@tty1.service
+Conflicts=getty@tty1.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/ubuntu-reset/firstboot.sh
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+RemainAfterExit=yes
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

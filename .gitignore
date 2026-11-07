@@ -1,0 +1,8 @@
+/build*/
+/dist/
+/_CPack_Packages/
+*.deb
+*.squashfs
+*.img
+*.img.xz
+*.part

@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+case "${1:-}" in prereqs) exit 0 ;; esac
+[ -f /etc/ubuntu-reset/boot.conf ] || exit 0
+. /usr/share/initramfs-tools/hook-functions
+mkdir -p "$DESTDIR/conf" "$DESTDIR/usr/lib/ubuntu-reset"
+copy_file config /etc/ubuntu-reset/boot.conf /conf/ubuntu-reset.conf
+copy_file script /usr/lib/ubuntu-reset/reconcile.sh /usr/lib/ubuntu-reset/reconcile.sh
+copy_exec /usr/bin/rsync /usr/bin/rsync
+copy_exec /usr/bin/sha256sum /usr/bin/sha256sum
+copy_exec /usr/bin/du /usr/bin/du
+copy_exec /usr/bin/df /usr/bin/df
+copy_exec /usr/bin/stat /usr/bin/stat
+copy_exec /usr/sbin/blkid /usr/sbin/blkid
+for module in ext4 squashfs loop vfat nls_utf8 nls_cp437 usb_storage uas xhci_pci; do
+    manual_add_modules "$module"
+done

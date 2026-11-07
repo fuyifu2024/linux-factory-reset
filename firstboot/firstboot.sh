@@ -1,0 +1,29 @@
+#!/bin/bash
+# Runs only in an administrator's clean x86 profile, after factory restore.
+set -euo pipefail
+[[ $EUID -eq 0 ]] || exit 1
+[[ ! -e /var/lib/ubuntu-reset-firstboot-complete ]] || exit 0
+echo 'Ubuntu initial setup / 首次开机设置'
+echo 'Create a new local administrator. / 请创建新的本地管理员。'
+if [[ -f /var/lib/ubuntu-reset-firstboot-user ]]; then
+    read -r factory_user </var/lib/ubuntu-reset-firstboot-user
+    [[ $factory_user =~ ^[a-z][a-z0-9_-]{0,31}$ ]] || exit 1
+else
+    while :; do
+        read -r -p 'Username / 用户名: ' factory_user
+        if [[ $factory_user =~ ^[a-z][a-z0-9_-]{0,31}$ ]] && ! getent passwd "$factory_user" >/dev/null; then
+            break
+        fi
+        echo 'Use a new lowercase username (1–32 characters).'
+    done
+    umask 077
+    printf '%s\n' "$factory_user" >/var/lib/ubuntu-reset-firstboot-user
+fi
+if ! getent passwd "$factory_user" >/dev/null; then
+    useradd --create-home --shell /bin/bash "$factory_user"
+fi
+while ! passwd "$factory_user"; do echo 'Password setup failed; try again.'; done
+usermod --append --groups sudo "$factory_user"
+passwd --lock root >/dev/null
+touch /var/lib/ubuntu-reset-firstboot-complete
+echo 'Initial setup complete. / 首次设置完成。'

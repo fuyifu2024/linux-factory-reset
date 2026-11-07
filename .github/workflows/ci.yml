@@ -1,0 +1,32 @@
+name: Build and test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and fixture-test dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ libssl-dev nlohmann-json3-dev rsync squashfs-tools shellcheck
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+      - name: Build
+        run: cmake --build build -j2
+      - name: Tests (temporary directories only)
+        run: ctest --test-dir build --output-on-failure
+      - name: Shell validation
+        run: shellcheck -e SC1091 boot/hook boot/local-bottom boot/reconcile.sh firstboot/firstboot.sh tests/reconcile.sh
+      - name: Package
+        run: cd build && cpack -G DEB
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-reset-${{ matrix.runner }}
+          path: build/*.deb
