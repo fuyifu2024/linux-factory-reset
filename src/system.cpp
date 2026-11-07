@@ -96,14 +96,16 @@ static json reference(const fs::path& root, const fs::path& boot, const std::str
     need(kind != "raspi-arm64" || os.at("id") == "ubuntu", "Native Pi firmware adapter currently requires Ubuntu; Debian ARM64 uses UEFI+GRUB");
     for (const auto& name : {"etc/passwd", "etc/shadow", "etc/fstab", "var/lib/dpkg/status"})
         need(fs::is_regular_file(root / name) && !fs::is_symlink(root / name), "Missing installed-system reference file: " + std::string(name));
-    std::istringstream passwd(read(root / "etc/passwd")); std::string line;
+    std::istringstream passwd(read(root / "etc/passwd")); std::string line; bool root_account = false;
     while (std::getline(passwd, line)) {
         std::istringstream fields(line); std::vector<std::string> f; std::string value;
         while (std::getline(fields, value, ':')) f.push_back(value);
         need(f.size() == 7 && std::regex_match(f[2], std::regex("[0-9]+")), "Invalid reference passwd");
         auto uid = std::stoul(f[2]);
+        if (uid == 0) { need(f[0] == "root" && !root_account, "Reference contains an alternate or duplicate root account"); root_account = true; }
         need(!(uid >= 1000 && uid < 60000 && f[0] != "oem" && f[0] != "gnome-initial-setup"), "Reference contains a personal user: " + f[0]);
     }
+    need(root_account, "Reference has no root system account");
     need(!fs::is_symlink(root / "home"), "Reference home cannot be a symlink");
     if (fs::exists(root / "home")) for (const auto& e : fs::directory_iterator(root / "home")) need(e.path().filename() == "oem", "Reference contains personal home directories");
     need(!fs::exists(root / "casper") && !fs::exists(root / "rofs"), "A live ISO root is not an installed-system reference");
@@ -176,6 +178,16 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
     // Root's personal data must not become part of an administrator-created profile.
     fs::remove_all(r / "root"); fs::create_directory(r / "root"); fs::permissions(r / "root", fs::perms::owner_all);
     for (const auto& name : {"etc/machine-id", "var/lib/dbus/machine-id"}) if (fs::exists(r / name) && !fs::is_symlink(r / name)) write(r / name, "");
+    // Never transfer a factory root password or passwordless root into the restored system.
+    std::istringstream shadows(read(r / "etc/shadow")); std::ostringstream locked_shadow; std::string shadow_line; bool locked_root = false;
+    while (std::getline(shadows, shadow_line)) {
+        if (shadow_line.starts_with("root:")) {
+            need(!locked_root, "Duplicate root shadow record"); auto colon = shadow_line.find(':', 5);
+            need(colon != std::string::npos, "Invalid root shadow record"); shadow_line.replace(5, colon-5, "!"); locked_root = true;
+        }
+        locked_shadow << shadow_line << '\n';
+    }
+    need(locked_root, "Reference has no root shadow record"); write(r / "etc/shadow", locked_shadow.str());
     fs::remove(r / "var/lib/systemd/random-seed");
     if (fs::is_directory(r / "etc/ssh")) for (const auto& e : fs::directory_iterator(r / "etc/ssh")) if (str(e.path().filename()).starts_with("ssh_host_") && e.is_regular_file()) fs::remove(e.path());
     auto boot_mount = kind == "raspi-arm64" ? "/boot/firmware" : "/boot/efi";
@@ -215,6 +227,11 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
             if (p == r / "boot/grub/grub.cfg") text = normalize_grub_roots(text, old_uuid, root_spec);
             replace_all(text, old_uuid, "@ROOT_UUID@"); write(p, text);
         }
+        // PID 1's generic firstboot wizard can otherwise block sysinit before our account wizard.
+        // Mask only that service in this private profile; machine-id still regenerates normally.
+        fs::create_directories(r / "etc/systemd/system");
+        auto generic_firstboot = r / "etc/systemd/system/systemd-firstboot.service";
+        fs::remove(generic_firstboot); fs::create_symlink("/dev/null", generic_firstboot);
         // Both x86_64 and generic ARM64 UEFI use the local-console first-user wizard.
         fs::create_directories(r / "usr/lib/ubuntu-reset"); fs::create_directories(r / "etc/systemd/system/multi-user.target.wants");
         fs::copy_file(firstboot_assets / "firstboot.sh", r / "usr/lib/ubuntu-reset/firstboot.sh", fs::copy_options::overwrite_existing);

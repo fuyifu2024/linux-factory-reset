@@ -151,6 +151,7 @@ int main() {
         check(fs::file_size(image) > 0, "compressed profile built");
         auto unpack = tmp.path / "unpack";
         run({"unsquashfs", "-no-progress", "-d", unpack.string(), image.string()});
+        check(read(unpack / "root/etc/shadow").starts_with("root:!:"), "factory root password is locked before any first boot");
         check(read(unpack / "root/etc/machine-id").empty(), "machine identity removed");
         check(!fs::exists(unpack / "root/etc/ssh/ssh_host_ed25519_key"), "SSH host identity removed");
         check(read(unpack / "root/etc/fstab").find("@ROOT_UUID@") != std::string::npos, "fstab prepared for target");
@@ -192,6 +193,7 @@ int main() {
                 validate_reference(extracted / "root", extracted / "boot", platform, true); ++checks;
                 check(read(efi_directory(extracted / "boot", distro) / "grub.cfg").find("@ROOT_UUID@") != std::string::npos, "correct distributor EFI pointer relocatable");
                 check(read(extracted / "root/boot/grub/grub.cfg").find("@ROOT_UUID@") != std::string::npos, "UEFI root menu relocatable");
+                check(fs::read_symlink(extracted / "root/etc/systemd/system/systemd-firstboot.service") == "/dev/null", "stock firstboot cannot block the project first-user flow");
                 check(fs::is_symlink(extracted / "root/etc/systemd/system/multi-user.target.wants/ubuntu-reset-firstboot.service"), "generic UEFI first-user wizard enabled");
                 check(read(ur / "etc/fstab").find("01234567-abcd") != std::string::npos, "original reference left unchanged");
                 write(extracted / "root/boot/grub/grub.cfg", "root=UUID=unrelocated\n");

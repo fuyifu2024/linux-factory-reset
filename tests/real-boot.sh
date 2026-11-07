@@ -54,6 +54,7 @@ for file in "$work/target/etc/fstab" "$work/target/boot/grub/grub.cfg" "$work/ta
 done
 umount "$work/target-boot"
 mkdir -p "$work/target/usr/local/sbin" "$work/target/etc/systemd/system/multi-user.target.wants"
+ln -sf /dev/null "$work/target/etc/systemd/system/systemd-firstboot.service"
 printf 'REC_UUID=%s\n' "$recovery_uuid" >"$work/target/etc/lfr-qa.conf"
 cat >"$work/target/usr/local/sbin/lfr-qa" <<'GUEST'
 #!/bin/bash
