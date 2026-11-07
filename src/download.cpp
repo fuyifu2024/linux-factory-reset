@@ -110,7 +110,7 @@ OfficialImage parse_sums(const std::string& text, const std::string& distro, con
     need(distro == "debian" || distro == "ubuntu", "Unsupported checksum catalog");
     need(edition == "netinst" || edition == "desktop" || edition == "server", "Unsupported image edition");
     const std::string pattern = distro == "debian" ? "debian-[0-9]+(\\.[0-9]+)*-" + arch + "-netinst\\.iso" :
-        "ubuntu-[0-9]+\\.[0-9]+(\\.[0-9]+)*-" + (edition == "server" ? "live-server" : "desktop") + "-" + arch + "\\.iso";
+        std::string("ubuntu-[0-9]+\\.[0-9]+(\\.[0-9]+)*-") + (edition == "server" ? "live-server" : "desktop") + "-" + arch + "\\.iso";
     std::istringstream lines(text); std::string line; OfficialImage found;
     while (std::getline(lines, line)) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
