@@ -304,7 +304,8 @@ TempDir::TempDir(const fs::path& parent) {
 }
 TempDir::~TempDir() { if (!path.empty()) { std::error_code e; fs::remove_all(path, e); } }
 Mount::Mount(const fs::path& device, const std::string& type, const std::string& options) : temp("/run") {
-    run({"mount", "-t", type, "-o", options, device.string(), temp.path.string()});
+    auto flags = type == "vfat" ? options + ",iocharset=ascii,utf8=1,codepage=437" : options;
+    run({"mount", "-t", type, "-o", flags, device.string(), temp.path.string()});
 }
 Mount::~Mount() {
     // If unmount fails, don't recurse into the still-mounted reference tree.
