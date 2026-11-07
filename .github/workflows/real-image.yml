@@ -7,6 +7,11 @@ on:
         type: choice
         options: [amd64, arm64]
         default: amd64
+      mode:
+        description: Exercise local IMG import or the real automatic official download path
+        type: choice
+        options: [local, automatic]
+        default: local
 permissions:
   contents: read
 jobs:
@@ -33,11 +38,12 @@ jobs:
       - name: Validate a real source, then actually restore an expendable UEFI VM
         env:
           SOURCE_ARCH: ${{ inputs.architecture }}
+          RECOVERY_MODE: ${{ inputs.mode }}
         run: |
           if [ "$SOURCE_ARCH" = arm64 ]; then
             sudo env GITHUB_ACTIONS=true sh tests/real-image.sh "$PWD/build/linux-factory-reset" "$PWD/evidence" "$PWD/firstboot" "" arm64
           else
-            sudo env GITHUB_ACTIONS=true sh tests/real-image.sh "$PWD/build/linux-factory-reset" "$PWD/evidence" "$PWD/firstboot" "$PWD"/build-vm/*.deb amd64
+            sudo env GITHUB_ACTIONS=true sh tests/real-image.sh "$PWD/build/linux-factory-reset" "$PWD/evidence" "$PWD/firstboot" "$PWD"/build-vm/*.deb amd64 "$RECOVERY_MODE"
           fi
       - uses: actions/upload-artifact@v4
         if: always()

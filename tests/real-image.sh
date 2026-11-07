@@ -58,6 +58,6 @@ if [ "$result" -eq 0 ] && [ -n "${4:-}" ]; then
     umount "$work/root"
     umount "$work/boot"
     losetup --detach "$loop"; loop=''
-    sh tests/real-boot.sh "$work/disk.raw" "$4" "$evidence"
+    sh tests/real-boot.sh "$work/disk.raw" "$4" "$evidence" "${6:-local}"
 fi
 exit "$result"

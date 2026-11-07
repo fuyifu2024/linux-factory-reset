@@ -5,6 +5,8 @@ set -eu
 source=$1
 package=$2
 evidence=$3
+mode=${4:-local}
+case "$mode" in local|automatic) ;; *) exit 1 ;; esac
 work=$(mktemp -d /var/lib/linux-reset-vm.XXXXXX)
 target_loop='' recovery_loop='' vm_pid=''
 cleanup() {
@@ -25,7 +27,7 @@ mkfs.ext4 -q "$recovery_loop"
 recovery_uuid=$(blkid -s UUID -o value "$recovery_loop")
 mkdir "$work/recovery" "$work/target"
 mount "$recovery_loop" "$work/recovery"
-cp --sparse=always "$source" "$work/recovery/pristine.raw"
+if [ "$mode" = local ]; then cp --sparse=always "$source" "$work/recovery/pristine.raw"; fi
 cp "$package" "$work/recovery/tool.deb"
 umount "$work/recovery"
 losetup --detach "$recovery_loop"; recovery_loop=''
@@ -55,7 +57,7 @@ done
 umount "$work/target-boot"
 mkdir -p "$work/target/usr/local/sbin" "$work/target/etc/systemd/system/multi-user.target.wants"
 ln -sf /dev/null "$work/target/etc/systemd/system/systemd-firstboot.service"
-printf 'REC_UUID=%s\n' "$recovery_uuid" >"$work/target/etc/lfr-qa.conf"
+printf 'REC_UUID=%s\nREC_MODE=%s\n' "$recovery_uuid" "$mode" >"$work/target/etc/lfr-qa.conf"
 cat >"$work/target/usr/local/sbin/lfr-qa" <<'GUEST'
 #!/bin/bash
 set -Eeuo pipefail
@@ -93,7 +95,11 @@ OBSERVER
 sed '1d' /usr/lib/ubuntu-reset/firstboot.sh
 } >/tmp/lfr-observed-firstboot
 install -m 755 /tmp/lfr-observed-firstboot /usr/lib/ubuntu-reset/firstboot.sh
-linux-factory-reset prepare-image --file /mnt/recovery/pristine.raw --storage /mnt/recovery
+if [[ $REC_MODE == automatic ]]; then
+    linux-factory-reset prepare-auto --storage /mnt/recovery
+else
+    linux-factory-reset prepare-image --file /mnt/recovery/pristine.raw --storage /mnt/recovery
+fi
 udevadm settle
 echo LFR_VM_READY_TO_ARM >/dev/ttyS0
 linux-factory-reset arm --confirm ERASE-ALL-USERS --reboot
