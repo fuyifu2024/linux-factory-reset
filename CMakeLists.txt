@@ -41,6 +41,7 @@ install(FILES firstboot/ubuntu-reset-firstboot.service DESTINATION lib/ubuntu-re
 install(FILES packaging/linux-factory-reset.desktop DESTINATION share/applications)
 install(FILES packaging/linux-factory-reset.svg DESTINATION share/icons/hicolor/scalable/apps)
 install(FILES LICENSE README.md README.en.md DESTINATION share/doc/linux-factory-reset)
+install(DIRECTORY docs/ DESTINATION share/doc/linux-factory-reset/docs)
 set(CPACK_GENERATOR DEB)
 set(CPACK_PACKAGE_CONTACT "fuyifu2024 <fuyifu2024@users.noreply.github.com>")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Experimental Linux recovery preparation and official image downloader")

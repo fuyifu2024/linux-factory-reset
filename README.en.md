@@ -4,7 +4,7 @@
 
 A C++20 official-image downloader and experimental Linux recovery tool. Renamed from `ubuntu-reset`; the old command remains a compatibility entry point.
 
-**Development preview: this is not yet a universal one-click factory reset for arbitrary Linux installations.** The reset backend removes existing accounts and files, but a real VM/hardware reboot-and-restore acceptance test has not been completed.
+**Development preview: this is not yet a universal one-click factory reset for arbitrary Linux installations.** A Debian 13 AMD64 UEFI VM passed actual restoration, removal of the old account/test files, new-administrator creation and powered-off disk checks. Physical hardware, ARM64 boot and other distributions still need runtime validation. See the [v0.4 acceptance record](docs/validation/v0.4.0-alpha.1.md).
 
 ## Capabilities
 
