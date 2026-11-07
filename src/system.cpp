@@ -129,6 +129,7 @@ static json reference(const fs::path& root, const fs::path& boot, const std::str
         need(fs::is_regular_file(efi / (std::string("grub") + suffix + ".efi")), "Missing architecture-specific GRUB EFI binary");
         bool kernel_set = false;
         if (fs::is_directory(root / "usr/lib/modules")) for (const auto& entry : fs::directory_iterator(root / "usr/lib/modules")) {
+            require_inside(root, entry.path());
             auto version = entry.path().filename().string();
             for (const auto& file : {root / "boot" / ("vmlinuz-" + version), root / "boot" / ("initrd.img-" + version)}) require_inside(root, file);
             if (entry.is_directory() && fs::is_regular_file(root / "boot" / ("vmlinuz-" + version)) && fs::is_regular_file(root / "boot" / ("initrd.img-" + version))) kernel_set = true;
@@ -296,7 +297,7 @@ void prepare_image(const fs::path& selected, const fs::path& location) {
         }
         need(expanded && expanded < (128ULL << 30) && fs::space(st.work).available > expanded * 2 + (2ULL << 30), "镜像展开或生成恢复资料所需空间不足，或镜像过大");
         int fd = open(raw.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600); need(fd >= 0, "无法展开本地镜像");
-        auto rc = command({"xz", "--decompress", "--stdout", snapshot.string()}, false, fd).code; close(fd); need(rc == 0, "镜像解压失败");
+        auto rc = command({"xz", "--decompress", "--stdout", snapshot.string()}, false, fd, false, false, false, expanded).code; close(fd); need(rc == 0, "镜像解压失败");
     } else if (format == "qcow2") {
         auto info = json::parse(output({"qemu-img", "info", "--output=json", "-f", "qcow2", snapshot.string()}));
         need(!info.contains("backing-filename") && !info.contains("full-backing-filename") && !info.value("encrypted", false), "请先导出独立、未加密的完整虚拟磁盘镜像，不能使用增量快照");
@@ -338,7 +339,7 @@ void prepare_pi(const std::string& release, const fs::path& location) {
     TempDir tmp(st.work); auto image = tmp.path / "source.img", profile = st.work / "prepared.squashfs";
     need(!fs::exists(profile), "Stale prepared.squashfs exists; inspect/remove it first");
     int fd = open(image.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600); need(fd >= 0, "Cannot create source image");
-    auto rc = command({"xz", "--decompress", "--stdout", str(compressed)}, false, fd).code; close(fd); need(rc == 0, "Image decompression failed");
+    auto rc = command({"xz", "--decompress", "--stdout", str(compressed)}, false, fd, false, false, false, expanded).code; close(fd); need(rc == 0, "Image decompression failed");
     json provenance{{"url", base + file}, {"sha256", sum}, {"verified", "Ubuntu CD image GPG signature"}};
     {
         Loop loop(image); run({"udevadm", "settle"}); auto partitions = json::parse(output({"lsblk", "--json", "-o", "PATH,FSTYPE", loop.device}));

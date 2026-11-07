@@ -56,6 +56,7 @@ static bool privileged(Args args, bool preview = false) {
 
 struct DownloadDialog {
     pid_t pid = -1; int input = -1;
+    std::chrono::steady_clock::time_point last{};
     DownloadDialog() {
         int channel[2]; need(pipe2(channel, O_CLOEXEC) == 0, "Cannot open progress channel");
         pid = fork();
@@ -70,6 +71,8 @@ struct DownloadDialog {
     bool update(const TransferProgress& progress) {
         int status = 0; auto exited = waitpid(pid, &status, WNOHANG);
         if (exited == pid) { pid = -1; return false; }
+        auto now = std::chrono::steady_clock::now();
+        if (now - last < std::chrono::milliseconds(120)) return true; last = now;
         auto message = std::to_string(progress.percent()) + "\n# " + progress.text() +
             (progress.total && progress.downloaded >= progress.total ? "\n# 下载完成，正在校验 SHA-256，请稍候。\n" : "\n");
         return ::write(input, message.data(), message.size()) == static_cast<ssize_t>(message.size());

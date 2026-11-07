@@ -1,5 +1,6 @@
 #pragma once
 #include <filesystem>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <nlohmann/json.hpp>
@@ -19,9 +20,9 @@ inline const fs::path REQUEST = "/var/lib/ubuntu-reset/request";
 void need(bool condition, const std::string& message);
 std::string read(const fs::path& path);
 void write(const fs::path& path, const std::string& data);
-std::string sha256(const fs::path& path);
+std::string sha256(const fs::path& path, const std::function<void(uint64_t)>& progress = {});
 Result command(const Args& args, bool capture = true, int stdout_fd = -1, bool desktop = false,
-               bool merge_errors = false, bool live_output = false);
+               bool merge_errors = false, bool live_output = false, uint64_t output_limit = 0);
 std::string output(const Args& args);
 void run(const Args& args);
 void root_only();

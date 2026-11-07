@@ -2,11 +2,14 @@
 #include "download.hpp"
 #include <fcntl.h>
 #include <iostream>
+#include <csignal>
 #include <set>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
+static volatile std::sig_atomic_t download_interrupted = 0;
+static void stop_download(int) { download_interrupted = 1; }
 static void help() {
     std::cout << "Linux Factory Reset " << uf::VERSION << " (C++20, experimental)\n"
         "  linux-factory-reset gui [--preview]\n"
@@ -61,7 +64,7 @@ int main(int argc, char** argv) {
             auto proxy = options.contains("--proxy") ? get("--proxy") : "";
             auto image = uf::resolve_image(get("--distro"), get("--release"), get("--edition"), get("--arch"), proxy);
             if (cmd == "resolve") std::cout << image.describe().dump(2) << '\n';
-            else { auto path = uf::download_official(image, get("--directory"), [](const uf::TransferProgress& p) { std::cerr << "\r" << p.percent() << "%  " << p.text() << "          " << std::flush; return true; }, proxy); std::cout << "\nSaved: " << path << "\nSHA-256 OK. ISO automatic restore is not implemented.\n"; }
+            else { std::signal(SIGINT, stop_download); std::signal(SIGTERM, stop_download); auto path = uf::download_official(image, get("--directory"), [](const uf::TransferProgress& p) { std::cerr << "\r" << p.percent() << "%  " << p.text() << "          " << std::flush; return !download_interrupted; }, proxy); std::cout << "\nSaved: " << path << "\nSHA-256 OK. ISO automatic restore is not implemented.\n"; }
             return 0;
         }
         uf::root_only();

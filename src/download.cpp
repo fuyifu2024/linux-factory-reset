@@ -168,7 +168,7 @@ fs::path download_official(const OfficialImage& image, const fs::path& directory
         request(image.url, t, proxy); need(t.written > 0 && (!image.size || t.written == image.size), "镜像大小与官网记录不符");
         need(fsync(fd) == 0, "Cannot flush downloaded image"); close(fd); fd = -1;
         if (t.callback && !t.callback({t.written, t.written, 0})) throw Cancelled();
-        need(sha256(partial) == image.checksum, "SHA-256 校验失败，已删除下载临时文件");
+        need(sha256(partial, [&](uint64_t) { if (t.callback && !t.callback({t.written, t.written, 0})) throw Cancelled(); }) == image.checksum, "SHA-256 校验失败，已删除下载临时文件");
         // Hard-link publication is atomic and refuses to replace an existing destination.
         need(link(partial.c_str(), destination.c_str()) == 0, "无法保存镜像，可能已有同名文件"); fs::remove(partial);
         return destination;

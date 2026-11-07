@@ -11,6 +11,7 @@
 #include <regex>
 #include <sstream>
 #include <sys/random.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -35,19 +36,21 @@ static std::string hex(const unsigned char* data, size_t length) {
     for (size_t i = 0; i < length; ++i) { value += chars[data[i] >> 4]; value += chars[data[i] & 15]; }
     return value;
 }
-std::string sha256(const fs::path& path) {
+std::string sha256(const fs::path& path, const std::function<void(uint64_t)>& progress) {
     std::ifstream f(path, std::ios::binary); need(f.good(), "Cannot hash " + path.string());
     std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> ctx(EVP_MD_CTX_new(), EVP_MD_CTX_free);
     need(ctx && EVP_DigestInit_ex(ctx.get(), EVP_sha256(), nullptr) == 1, "SHA-256 initialization failed");
     std::array<char, 1024 * 1024> buffer{};
+    uint64_t processed = 0;
     while (f) { f.read(buffer.data(), buffer.size());
+        processed += static_cast<uint64_t>(f.gcount()); if (progress) progress(processed);
         need(EVP_DigestUpdate(ctx.get(), buffer.data(), static_cast<size_t>(f.gcount())) == 1, "SHA-256 update failed"); }
     need(!f.bad(), "Hash read error");
     unsigned char bytes[EVP_MAX_MD_SIZE]; unsigned size = 0;
     need(EVP_DigestFinal_ex(ctx.get(), bytes, &size) == 1, "SHA-256 finalization failed");
     return hex(bytes, size);
 }
-Result command(const Args& args, bool capture, int stdout_fd, bool desktop, bool merge_errors, bool live_output) {
+Result command(const Args& args, bool capture, int stdout_fd, bool desktop, bool merge_errors, bool live_output, uint64_t output_limit) {
     need(!args.empty(), "Empty command");
     fs::path exe;
     if (args[0].starts_with("/")) exe = args[0];
@@ -64,6 +67,7 @@ Result command(const Args& args, bool capture, int stdout_fd, bool desktop, bool
         if (capture) { close(pipes[0]); if (dup2(pipes[1], STDOUT_FILENO) < 0) _exit(126); close(pipes[1]); }
         else if (stdout_fd >= 0 && dup2(stdout_fd, STDOUT_FILENO) < 0) _exit(126);
         if (merge_errors && dup2(STDOUT_FILENO, STDERR_FILENO) < 0) _exit(126);
+        if (output_limit) { struct rlimit size{static_cast<rlim_t>(output_limit), static_cast<rlim_t>(output_limit)}; if (setrlimit(RLIMIT_FSIZE, &size) != 0) _exit(126); }
         std::vector<char*> av;
         for (const auto& arg : args) av.push_back(const_cast<char*>(arg.c_str()));
         av.push_back(nullptr);

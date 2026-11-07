@@ -1,6 +1,8 @@
 #include "reset.hpp"
 #include "download.hpp"
 #include <iostream>
+#include <fcntl.h>
+#include <unistd.h>
 #include <sys/stat.h>
 
 using namespace uf;
@@ -27,6 +29,11 @@ int main() {
         check(!preparation_status(tmp.path / "broken-state", false).at("ready").get<bool>(), "corrupt preparation metadata does not enable preview");
         write(tmp.path / "state.json", state().dump());
         check(preparation_status(tmp.path / "state.json", false).at("ready").get<bool>(), "valid preparation metadata enables preview");
+        auto bounded_file = tmp.path / "bounded-output";
+        int bounded_fd = open(bounded_file.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+        check(bounded_fd >= 0, "bounded output fixture opened");
+        auto bounded = command({"head", "-c", "128", "/dev/zero"}, false, bounded_fd, false, false, false, 64); close(bounded_fd);
+        check(bounded.code != 0 && fs::file_size(bounded_file) <= 64, "child cannot exceed decompression output limit");
         auto diagnostic = command({"sh", "-c", "printf actual-child-error >&2; exit 7"}, true, -1, false, true);
         check(diagnostic.code == 7 && diagnostic.text == "actual-child-error", "GUI receives actual backend stderr with exit code");
         auto ui = json::parse(output({UFRESET_TEST_APP, "gui", "--preview"}));
