@@ -277,7 +277,7 @@ struct Loop {
 };
 static void import_disk_image(const fs::path& image, const fs::path& profile, const Storage& st, const json& provenance) {
     Loop loop(image); run({"udevadm", "settle"});
-    auto parts = json::parse(output({"lsblk", "--json", "-o", "PATH,FSTYPE", loop.device}));
+    auto parts = json::parse(output({"lsblk", "--json", "--tree", "-o", "PATH,FSTYPE", loop.device}));
     std::vector<std::string> roots, boots;
     for (const auto& p : parts.at("blockdevices")[0].value("children", json::array())) {
         if (p["fstype"] == "ext4") roots.push_back(p["path"]);
@@ -395,7 +395,7 @@ void prepare_pi(const std::string& release, const fs::path& location) {
     auto rc = command({"xz", "--decompress", "--stdout", str(compressed)}, false, fd, false, false, false, expanded).code; close(fd); need(rc == 0, "Image decompression failed");
     json provenance{{"url", base + file}, {"sha256", sum}, {"verified", "Ubuntu CD image GPG signature"}};
     {
-        Loop loop(image); run({"udevadm", "settle"}); auto partitions = json::parse(output({"lsblk", "--json", "-o", "PATH,FSTYPE", loop.device}));
+        Loop loop(image); run({"udevadm", "settle"}); auto partitions = json::parse(output({"lsblk", "--json", "--tree", "-o", "PATH,FSTYPE", loop.device}));
         std::vector<std::string> roots, boots;
         for (const auto& p : partitions["blockdevices"][0].at("children")) {
             if (p["fstype"] == "ext4") roots.push_back(p["path"]);
