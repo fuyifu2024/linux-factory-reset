@@ -3,7 +3,6 @@ Description=Create a new administrator after Debian/Ubuntu factory reset
 ConditionPathExists=!/var/lib/ubuntu-reset-firstboot-complete
 After=local-fs.target
 Before=display-manager.service getty@tty1.service
-Conflicts=getty@tty1.service
 
 [Service]
 Type=oneshot

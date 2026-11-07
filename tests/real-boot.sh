@@ -82,7 +82,7 @@ fi
 systemd-run --unit=lfr-qa-observer --property=StandardOutput=tty --property=TTYPath=/dev/ttyS0 /bin/bash -c '
     for ((i=0;i<180;i++)); do
         if test -f /var/lib/ubuntu-reset-firstboot-complete; then
-            if getent passwd lfrqatest && id -nG lfrqatest | grep -qw sudo && passwd -S root | grep -q " L "; then sync; echo LFR_VM_RESTORE_PASS; else echo LFR_VM_NEW_USER_FAIL; fi
+            if getent passwd lfrqatest && id -nG lfrqatest | grep -qw sudo && passwd -S root | grep -q " L "; then echo PASS >/var/lib/lfr-qa-result; sync; echo LFR_VM_RESTORE_PASS; else echo FAIL >/var/lib/lfr-qa-result; sync; echo LFR_VM_NEW_USER_FAIL; fi
             systemctl --no-block poweroff; exit
         fi
         sleep 1
@@ -126,3 +126,20 @@ qemu-system-x86_64 -machine q35,accel=kvm -cpu host -m 2048 -smp 2 -display none
     -qmp unix:"$work/qmp.sock",server=on,wait=off -monitor none >"$evidence/qemu.txt" 2>&1 &
 vm_pid=$!
 node tests/drive-firstboot.mjs "$work/qmp.sock" "$evidence/vm-serial.txt"
+# The serial getty can reset its tty during shutdown; verify a synced result on disk too.
+kill "$vm_pid" 2>/dev/null || :
+wait "$vm_pid" 2>/dev/null || :
+vm_pid=''
+target_loop=$(losetup --find --show --read-only --partscan "$work/target.raw")
+udevadm settle
+target_root=$(lsblk -nrpo PATH,FSTYPE "$target_loop" | awk '$2 == "ext4" {print $1}')
+mount -t ext4 -o ro,noload "$target_root" "$work/target"
+cp "$work/target/var/lib/lfr-qa-result" "$evidence/guest-result.txt"
+grep -qx PASS "$evidence/guest-result.txt"
+grep -q '^lfrqatest:' "$work/target/etc/passwd"
+if grep -q '^lfr_old_user:' "$work/target/etc/passwd"; then exit 1; fi
+test ! -e "$work/target/home/lfr_old_user"
+test ! -e "$work/target/root/lfr-private"
+test ! -e "$work/target/opt/lfr-extra/unwanted"
+test ! -e "$work/target/var/lib/ubuntu-reset/request"
+echo 'Persistent restored-state verification passed.'
