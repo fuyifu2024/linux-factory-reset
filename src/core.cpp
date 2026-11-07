@@ -244,6 +244,19 @@ std::string signed_checksum(const std::string& text, const std::string& filename
     need(!found.empty(), "Image is absent from signed Ubuntu checksums"); return found;
 }
 
+
+void validate_grub_roots(const std::string& text) {
+    std::istringstream lines(text); std::string line; bool kernel = false; const std::regex arg("\\broot=([^ \\t]+)");
+    while (std::getline(lines, line)) {
+        std::istringstream fields(line); std::string token; fields >> token;
+        if (token == "linux" || token == "linuxefi" || token == "linux16") {
+            std::smatch match; need(std::regex_search(line, match, arg) && match[1] == "UUID=@ROOT_UUID@", "Recovery kernel still references a source device; prepare a new profile");
+            need(!std::regex_search(match.suffix().str(), arg), "Ambiguous recovery kernel root arguments"); kernel = true;
+        }
+    }
+    need(kernel, "Recovery profile has no supported Linux kernel entry");
+}
+
 std::string normalize_grub_roots(const std::string& text, const std::string& source_uuid, const std::string& source_spec) {
     need(valid_uuid(source_uuid), "Invalid source root UUID");
     std::istringstream lines(text); std::ostringstream result; std::string line; bool kernel = false;

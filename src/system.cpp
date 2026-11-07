@@ -146,6 +146,16 @@ static json reference(const fs::path& root, const fs::path& boot, const std::str
         if (prepared) need(fs::is_regular_file(root / "var/lib/ubuntu-reset-firstboot-ready") && fs::is_regular_file(root / "usr/lib/ubuntu-reset/firstboot.sh"), "UEFI profile is missing the initial-user setup flow");
     }
     if (prepared) {
+        std::istringstream shadows(read(root / "etc/shadow")); std::string record; bool locked = false;
+        while (std::getline(shadows, record)) if (record.starts_with("root:")) {
+            need(!locked && std::regex_match(record, std::regex("root:[!*]{1,8}:.*")), "Recovery profile contains a factory root credential; prepare it again"); locked = true;
+        }
+        need(locked, "Recovery profile has no locked root account");
+        if (kind != "raspi-arm64") {
+            auto mask = root / "etc/systemd/system/systemd-firstboot.service";
+            need(fs::is_symlink(mask) && fs::read_symlink(mask) == "/dev/null", "旧恢复资料可能卡在系统首次设置。请用新版重新准备镜像。");
+            validate_grub_roots(read(root / "boot/grub/grub.cfg"));
+        }
         auto fstab = read(root / "etc/fstab");
         need(fstab.find("@ROOT_UUID@") != std::string::npos && fstab.find("@BOOT_UUID@") != std::string::npos, "Profile fstab lacks relocation placeholders");
         if (kind == "raspi-arm64") {
@@ -409,7 +419,12 @@ fs::path preflight(const json& s) {
     auto mounts = json::parse(output({"findmnt", "--json", "--source", "UUID=" + s.at("store_uuid").get<std::string>(), "-o", "TARGET"}));
     need(mounts.at("filesystems").size() == 1, "Mount the prepared recovery partition first");
     auto path = fs::path(mounts["filesystems"][0].at("target").get<std::string>()) / s.at("file").get<std::string>();
-    secure(path); need(sha256(path) == s.at("sha256").get<std::string>(), "Recovery profile is damaged or changed"); return path;
+    secure(path); need(sha256(path) == s.at("sha256").get<std::string>(), "Recovery profile is damaged or changed");
+    // Re-audit old profiles before preparing an initramfs or writing the request marker.
+    Mount source(path, "squashfs", "ro,loop,nosuid,nodev,noexec");
+    auto actual = reference(source.temp.path / "root", source.temp.path / "boot", s.at("platform"), true);
+    need(actual.at("distro").get<std::string>() == state_distro(s), "Recovery source distribution changed");
+    return path;
 }
 void plan(const json& s) {
     root_only(); std::cout << "正在检查恢复磁盘与镜像完整性，这一步可能需要一些时间。\n" << std::flush;

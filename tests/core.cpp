@@ -141,7 +141,7 @@ int main() {
         std::string elf(64, '\0'); elf.replace(0, 4, "\177ELF", 4); elf[4] = 2; elf[5] = 1; elf[18] = static_cast<char>(183);
         write(r / "usr/bin/bash", elf);
         write(r / "usr/lib/os-release", "ID=ubuntu\nVERSION_ID=26.04\n");
-        write(r / "etc/passwd", "root:x:0:0:root:/root:/bin/bash\n"); write(r / "etc/shadow", "root:!:1:0:99999:7:::\n");
+        write(r / "etc/passwd", "root:x:0:0:root:/root:/bin/bash\n"); write(r / "etc/shadow", "root:synthetic-unsafe-factory-credential:1:0:99999:7:::\n");
         write(r / "etc/fstab", "LABEL=writable / ext4 defaults 0 1\nLABEL=system-boot /boot/firmware vfat defaults 0 2\n");
         write(r / "var/lib/dpkg/status", "Package: base-files\nStatus: install ok installed\n");
         write(r / "etc/machine-id", "must-not-survive\n"); write(r / "etc/ssh/ssh_host_ed25519_key", "private");
@@ -196,6 +196,14 @@ int main() {
                 check(fs::read_symlink(extracted / "root/etc/systemd/system/systemd-firstboot.service") == "/dev/null", "stock firstboot cannot block the project first-user flow");
                 check(fs::is_symlink(extracted / "root/etc/systemd/system/multi-user.target.wants/ubuntu-reset-firstboot.service"), "generic UEFI first-user wizard enabled");
                 check(read(ur / "etc/fstab").find("01234567-abcd") != std::string::npos, "original reference left unchanged");
+                write(extracted / "root/etc/shadow", "root:synthetic-unlocked:1:0:99999:7:::\n");
+                rejects([&] {validate_reference(extracted / "root", extracted / "boot", platform, true);}, "prebuilt profile cannot retain root credential");
+                write(extracted / "root/etc/shadow", "root:!:1:0:99999:7:::\n");
+                auto mask = extracted / "root/etc/systemd/system/systemd-firstboot.service"; fs::remove(mask);
+                rejects([&] {validate_reference(extracted / "root", extracted / "boot", platform, true);}, "legacy profile with competing firstboot wizard rejected");
+                fs::create_symlink("/dev/null", mask);
+                write(extracted / "root/boot/grub/grub.cfg", "linux /vmlinuz root=PARTUUID=source-1234\n# @ROOT_UUID@ in a comment is insufficient\n");
+                rejects([&] {validate_reference(extracted / "root", extracted / "boot", platform, true);}, "a comment placeholder does not make the kernel relocatable");
                 write(extracted / "root/boot/grub/grub.cfg", "root=UUID=unrelocated\n");
                 rejects([&] {validate_reference(extracted / "root", extracted / "boot", platform, true);}, "prepared GRUB without placeholder rejected");
                 fs::create_directory_symlink(outside, ur / "etc/systemd");

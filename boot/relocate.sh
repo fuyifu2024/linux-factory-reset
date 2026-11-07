@@ -26,6 +26,14 @@ uf_validate_profile() {
                 if [ "$uf_c" = "$uf_r/boot/grub/grub.cfg" ]; then uf_tree=$uf_r; else uf_tree=$uf_b; fi
                 uf_inside "$uf_tree" "$uf_c" && grep -q '@ROOT_UUID@' "$uf_c" || return 1
             done
+            awk '
+                $1 ~ /^linux(efi|16)?$/ {
+                    seen=1; roots=0;
+                    for (i=2;i<=NF;i++) if ($i ~ /^root=/) { roots++; if ($i != "root=UUID=@ROOT_UUID@") exit 1 }
+                    if (roots != 1) exit 1
+                }
+                END { if (!seen) exit 1 }
+            ' "$uf_r/boot/grub/grub.cfg" || return 1
             ;;
         *) return 1 ;;
     esac
