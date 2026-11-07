@@ -1,4 +1,5 @@
 #include "reset.hpp"
+#include "download.hpp"
 #include <iostream>
 #include <sys/stat.h>
 
@@ -17,6 +18,61 @@ static json state() {
 int main() {
     try {
         TempDir tmp("/tmp");
+        auto missing = tmp.path / "missing-state.json";
+        check(preparation_status(missing, false).at("code") == "not-prepared", "preview without recovery data has a guided state");
+        try { load_state(missing, false); check(false, "missing state rejected"); }
+        catch (const Error& e) { check(std::string(e.what()).find("has not been prepared") != std::string::npos, "no low-level Cannot inspect error for missing state"); }
+        check(!fs::exists(missing), "checking preview state never creates recovery data");
+        write(tmp.path / "broken-state", "broken json");
+        check(!preparation_status(tmp.path / "broken-state", false).at("ready").get<bool>(), "corrupt preparation metadata does not enable preview");
+        write(tmp.path / "state.json", state().dump());
+        check(preparation_status(tmp.path / "state.json", false).at("ready").get<bool>(), "valid preparation metadata enables preview");
+        auto diagnostic = command({"sh", "-c", "printf actual-child-error >&2; exit 7"}, true, -1, false, true);
+        check(diagnostic.code == 7 && diagnostic.text == "actual-child-error", "GUI receives actual backend stderr with exit code");
+        auto ui = json::parse(output({UFRESET_TEST_APP, "gui", "--preview"}));
+        check(!ui.at("requires_url_in_normal_flow").get<bool>(), "no required custom URL in ordinary flow");
+        check(ui.at("preview_requires_prepared_source").get<bool>(), "preview guard is advertised by the actual GUI");
+        for (const auto& item : ui.at("actions")) check(item.get<std::string>().find("树莓派") == std::string::npos, "no board-specific main-menu action");
+        check(image_format("official.img") == "raw" && image_format("vm.raw") == "raw", "local raw image classification");
+        check(image_format("official.img.xz") == "raw-xz" && image_format("vm.qcow2") == "qcow2", "compressed and VM image classification");
+        check(image_format("factory.squashfs") == "profile", "local prepared profile classification");
+        rejects([] {image_format("installer.iso");}, "installer ISO not falsely treated as installed root");
+        rejects([] {image_format("/dev/vda");}, "block device not treated as an image file");
+        check(!source_capabilities("debian", "13", "arm64-uefi").at("automatic_available").get<bool>(), "unimplemented official source not presented as ready");
+        check(source_capabilities("ubuntu", "26.04", "raspi-arm64").at("automatic_available").get<bool>(), "native source selected by detection, not menu branding");
+        json volume{{"uuid", "abcd-5678"}, {"target", "/media/recovery"}, {"fstype", "ext4"}, {"options", "rw,relatime"}};
+        json target{{"root", {{"uuid", "root-0001"}}}, {"boot", {{"uuid", "boot-0002"}}}};
+        check(recovery_mount("/media/recovery/folder/subfolder", volume, target) == "/media/recovery", "folder chooser accepts a recovery-disk subdirectory");
+        auto system_volume = volume; system_volume["uuid"] = "root-0001";
+        rejects([&] {recovery_mount("/media/recovery/folder", system_volume, target);}, "system folder cannot masquerade as recovery storage");
+        auto readonly = volume; readonly["options"] = "ro,errors=remount-ro";
+        rejects([&] {recovery_mount("/media/recovery", readonly, target);}, "read-only recovery storage refused");
+        check(image_format("SYSTEM.IMG.XZ") == "raw-xz", "uppercase image suffix accepted");
+        TransferProgress progress{1024, 2048, 512};
+        check(progress.percent() == 50 && progress.text().find("/s") != std::string::npos && progress.text().find("秒") != std::string::npos, "percent speed and ETA are visible");
+        check(TransferProgress{1,0,0}.percent() == 0 && TransferProgress{10,10,1}.percent() == 99, "unknown sizes and verification keep progress below success");
+        auto official = parse_sums(std::string(64,'a') + " *ubuntu-26.04.1-desktop-arm64.iso\n", "ubuntu", "26.04", "desktop", "arm64", "https://cdimage.ubuntu.com/releases/26.04/release/");
+        check(official.arch == "arm64" && !official.describe().at("automatic_restore").get<bool>(), "official ISO metadata never enables reset");
+        rejects([&] {parse_sums(std::string(64,'a') + " *../../escape.iso\n", "debian", "stable", "netinst", "amd64", "https://cdimage.debian.org/");}, "unsafe checksum filename rejected");
+        json releases = json::array();
+        for (const auto& version : {"45 Beta", "43", "44"}) releases.push_back({{"version", version}, {"arch", "aarch64"}, {"subvariant", "Workstation"}, {"link", "https://download.fedoraproject.org/pub/Fedora-" + std::string(version == std::string("45 Beta") ? "45" : version) + ".iso"}, {"sha256", std::string(64,'b')}, {"size", "1024"}});
+        auto fedora = parse_fedora(releases.dump(), "arm64", "workstation");
+        check(fedora.release == "44" && fedora.size == 1024, "Fedora selects newest stable ARM64, ignores beta");
+        releases[2]["link"] = "https://unofficial.example/fedora.iso";
+        rejects([&] {parse_fedora(releases.dump(), "arm64", "workstation");}, "Fedora metadata cannot replace the official source host");
+        releases[2]["link"] = "https://download.fedoraproject.org/pub/Fedora-44.iso";
+        releases.push_back(releases[2]);
+        rejects([&] {parse_fedora(releases.dump(), "arm64", "workstation");}, "ambiguous same-version Fedora image rejected");
+        // A cancellation before networking must delete the private .part and publish nothing.
+        bool cancelled = false;
+        try {download_official(official, tmp.path, [](const TransferProgress&) {return false;});} catch (const Cancelled&) {cancelled = true;}
+        check(cancelled && !fs::exists(tmp.path / official.filename), "cancel does not publish an image");
+        for (const auto& file : fs::directory_iterator(tmp.path)) check(file.path().filename().string().find(".part-") == std::string::npos, "cancel removes partial files");
+        auto safe = tmp.path / "containment", outside = tmp.path / "outside"; fs::create_directory(safe); fs::create_directory(outside);
+        fs::create_directory_symlink(outside, safe / "escape");
+        rejects([&] {require_inside(safe, safe / "escape/new-file");}, "ancestor symlink cannot escape staging root");
+        fs::create_directory(safe / "usr"); fs::create_directory(safe / "usr/lib"); fs::create_directory_symlink("usr/lib", safe / "lib");
+        require_inside(safe, safe / "lib/new-file"); ++checks;
         write(tmp.path / "hash", "abc");
         check(sha256(tmp.path / "hash") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "SHA256 known vector");
         check(random_id().size() == 32 && random_id() != random_id(), "random identifiers");
@@ -97,6 +153,9 @@ int main() {
                 auto base = tmp.path / (distro + version + platform);
                 auto ur = base / "reference", ub = base / "esp";
                 for (const auto& dir : {"etc", "usr/bin", "usr/sbin", "usr/lib", "var/lib/dpkg", "boot/grub", "home"}) fs::create_directories(ur / dir);
+                fs::create_directories(ur / "usr/lib/modules/fixture");
+                write(ur / "boot/vmlinuz-fixture", "synthetic kernel, never executed");
+                write(ur / "boot/initrd.img-fixture", "synthetic initrd, never executed");
                 auto efi = efi_directory(ub, distro); fs::create_directories(efi);
                 auto image_elf = elf; image_elf[18] = platform == "arm64-uefi" ? static_cast<char>(183) : static_cast<char>(62);
                 write(ur / "usr/bin/bash", image_elf);
@@ -122,6 +181,11 @@ int main() {
                 check(read(extracted / "root/boot/grub/grub.cfg").find("@ROOT_UUID@") != std::string::npos, "UEFI root menu relocatable");
                 check(fs::is_symlink(extracted / "root/etc/systemd/system/multi-user.target.wants/ubuntu-reset-firstboot.service"), "generic UEFI first-user wizard enabled");
                 check(read(ur / "etc/fstab").find("01234567-abcd") != std::string::npos, "original reference left unchanged");
+                write(extracted / "root/boot/grub/grub.cfg", "root=UUID=unrelocated\n");
+                rejects([&] {validate_reference(extracted / "root", extracted / "boot", platform, true);}, "prepared GRUB without placeholder rejected");
+                fs::create_directory_symlink(outside, ur / "etc/systemd");
+                rejects([&] {make_profile(ur, ub, platform, base / "escape.squashfs", {}, UFRESET_TEST_ASSETS);}, "malicious directory symlink rejected before staging writes");
+                fs::remove(ur / "etc/systemd");
                 fs::remove(loader);
                 rejects([&] {validate_reference(ur, ub, platform, false);}, "wrong or absent architecture EFI loader rejected");
                 write(loader, "fixture");

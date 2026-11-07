@@ -1,5 +1,6 @@
 #include "reset.hpp"
 #include <array>
+#include <cctype>
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
@@ -46,7 +47,7 @@ std::string sha256(const fs::path& path) {
     need(EVP_DigestFinal_ex(ctx.get(), bytes, &size) == 1, "SHA-256 finalization failed");
     return hex(bytes, size);
 }
-Result command(const Args& args, bool capture, int stdout_fd, bool desktop) {
+Result command(const Args& args, bool capture, int stdout_fd, bool desktop, bool merge_errors, bool live_output) {
     need(!args.empty(), "Empty command");
     fs::path exe;
     if (args[0].starts_with("/")) exe = args[0];
@@ -62,6 +63,7 @@ Result command(const Args& args, bool capture, int stdout_fd, bool desktop) {
     if (child == 0) {
         if (capture) { close(pipes[0]); if (dup2(pipes[1], STDOUT_FILENO) < 0) _exit(126); close(pipes[1]); }
         else if (stdout_fd >= 0 && dup2(stdout_fd, STDOUT_FILENO) < 0) _exit(126);
+        if (merge_errors && dup2(STDOUT_FILENO, STDERR_FILENO) < 0) _exit(126);
         std::vector<char*> av;
         for (const auto& arg : args) av.push_back(const_cast<char*>(arg.c_str()));
         av.push_back(nullptr);
@@ -79,6 +81,7 @@ Result command(const Args& args, bool capture, int stdout_fd, bool desktop) {
             auto count = ::read(pipes[0], buf.data(), buf.size());
             if (count < 0 && errno == EINTR) continue;
             if (count <= 0) break;
+            if (live_output) { std::cout.write(buf.data(), count); std::cout.flush(); }
             if (text.size() < 64 * 1024 * 1024) text.append(buf.data(), static_cast<size_t>(count));
         }
         close(pipes[0]);
@@ -172,7 +175,48 @@ void validate_state(const json& s) {
     need(valid_sha(s.at("sha256")), "Invalid profile digest");
     need(s.at("file") == "ubuntu-reset/factory-" + id + ".squashfs", "Invalid recovery path");
 }
-json load_state() { secure(STATE); auto s = json::parse(read(STATE)); validate_state(s); return s; }
+json load_state(const fs::path& path, bool check_permissions) {
+    need(fs::exists(path) || fs::is_symlink(path),
+         "Recovery data has not been prepared. Select and prepare a local recovery image first. No reset is scheduled.");
+    if (check_permissions) secure(path);
+    auto s = json::parse(read(path)); validate_state(s); return s;
+}
+json preparation_status(const fs::path& path, bool check_permissions) {
+    if (!fs::exists(path) && !fs::is_symlink(path))
+        return {{"ready", false}, {"reason", "请先选择并准备恢复镜像，然后再查看变更。当前没有可比较的恢复资料。"}, {"code", "not-prepared"}};
+    try { auto state = load_state(path, check_permissions); return {{"ready", true}, {"reason", "恢复资料已准备，可查看变更"}, {"code", "prepared"}}; }
+    catch (const std::exception& e) { return {{"ready", false}, {"reason", "恢复资料记录无法读取，请重新准备镜像。\n" + std::string(e.what())}, {"code", "invalid-state"}}; }
+}
+std::string image_format(const fs::path& file) {
+    auto name = file.filename().string();
+    for (auto& c : name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (name.ends_with(".iso")) throw Error("这是安装 ISO，不能直接覆盖系统。ISO 自动安装流程尚未实现；当前请选择完整已安装系统的 IMG/RAW 镜像。");
+    if (name.ends_with(".img.xz") || name.ends_with(".raw.xz")) return "raw-xz";
+    if (name.ends_with(".img") || name.ends_with(".raw")) return "raw";
+    if (name.ends_with(".qcow2")) return "qcow2";
+    if (name.ends_with(".squashfs")) return "profile";
+    throw Error("请选择 IMG、RAW、IMG.XZ、RAW.XZ、QCOW2 或本项目的恢复资料文件；不要选择虚拟磁盘设备。");
+}
+json source_capabilities(const std::string& distro, const std::string& version, const std::string& platform) {
+    bool automatic = distro == "ubuntu" && version == "26.04" && platform == "raspi-arm64";
+    return {{"automatic_available", automatic}, {"distro", distro}, {"version", version}, {"platform", platform},
+            {"automatic_release", automatic ? "26.04.1" : ""},
+            {"reason", automatic ? "可自动选择官方来源并验签，无需填写网址" : "当前设备还没有内置并验证的官方自动恢复源。请选择本地 IMG/RAW 等镜像；无需自建网址。"},
+            {"iso_automatic_install", false}, {"local_formats", {"img", "raw", "img.xz", "raw.xz", "qcow2", "squashfs"}}};
+}
+fs::path recovery_mount(const fs::path& selected, const json& filesystem, const json& target) {
+    need(filesystem.at("uuid") != target.at("root").at("uuid") && filesystem.at("uuid") != target.at("boot").at("uuid"),
+         "你选择的是当前系统盘或启动盘中的文件夹。恢复资料需要存放在另一块恢复磁盘上；普通系统文件夹不能代替它。虚拟机请先添加第二块虚拟硬盘，格式化为 ext4 并挂载，再选择该盘里的文件夹。尚未修改系统或设置恢复标记。");
+    need(filesystem.at("fstype") == "ext4", "所选位置不在 ext4 恢复磁盘上。请选择另一块已挂载的 ext4 磁盘；目前不会自动格式化磁盘。");
+    auto options = "," + filesystem.at("options").get<std::string>() + ",";
+    need(options.find(",rw,") != std::string::npos, "所选恢复磁盘是只读的，请以可写方式挂载后重试。");
+    auto mount = fs::path(filesystem.at("target").get<std::string>()).lexically_normal();
+    auto location = fs::absolute(selected).lexically_normal();
+    auto parent = location;
+    while (parent != mount && parent != parent.root_path()) parent = parent.parent_path();
+    need(parent == mount, "无法确认所选文件夹所属磁盘，请重新选择。");
+    return mount;
+}
 std::string boot_config(const json& s) {
     validate_state(s); std::string text;
     for (const auto& [shell, key] : std::map<std::string, std::string>{{"UF_ID", "id"}, {"UF_SHA", "sha256"}, {"UF_STORE", "store_uuid"}, {"UF_ROOT", "root_uuid"}, {"UF_BOOT", "boot_uuid"}, {"UF_FILE", "file"}, {"UF_PLATFORM", "platform"}})

@@ -26,4 +26,8 @@ while ! passwd "$factory_user"; do echo 'Password setup failed; try again.'; don
 usermod --append --groups sudo "$factory_user"
 passwd --lock root >/dev/null
 touch /var/lib/ubuntu-reset-firstboot-complete
+# Remove the one-time getty conflict before subsequent boots; don't stop our active tty.
+rm -f /etc/systemd/system/multi-user.target.wants/ubuntu-reset-firstboot.service
+systemctl daemon-reload
+systemctl --no-block start getty@tty1.service
 echo 'Initial setup complete. / 首次设置完成。'

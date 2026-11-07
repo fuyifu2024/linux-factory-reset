@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Linux Factory Reset
+Name[zh_CN]=Linux 恢复出厂设置
+Comment=Download official images and prepare experimental recovery
+Comment[zh_CN]=下载官方镜像并准备实验性恢复资料
+Exec=linux-factory-reset gui
+Icon=linux-factory-reset
+Terminal=true
+Categories=System;Settings;
+Keywords=reset;factory;recovery;Debian;Ubuntu;ARM64;恢复;出厂;

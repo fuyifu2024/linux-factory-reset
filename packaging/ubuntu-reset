@@ -1,0 +1,3 @@
+#!/bin/sh
+# Compatibility command for releases published before the project rename.
+exec /usr/bin/linux-factory-reset "$@"

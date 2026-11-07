@@ -1,5 +1,6 @@
 #include "reset.hpp"
 #include <chrono>
+#include <cerrno>
 #include <fcntl.h>
 #include <iostream>
 #include <regex>
@@ -50,11 +51,8 @@ struct Storage {
     fs::path work; json fsinfo; json hw;
     explicit Storage(const fs::path& path) {
         auto p = fs::canonical(path); fsinfo = filesystem(p); hw = hardware();
-        need(fsinfo["fstype"] == "ext4" && fsinfo.at("options").get<std::string>().find("rw") != std::string::npos,
-             "Recovery storage must be writable ext4");
-        need(fsinfo["target"] == str(p), "Select the recovery partition mountpoint, not a subdirectory");
-        need(fsinfo["uuid"] != hw["root"]["uuid"] && fsinfo["uuid"] != hw["boot"]["uuid"], "Recovery storage must be a separate filesystem");
-        work = p / "ubuntu-reset";
+        auto mount = recovery_mount(p, fsinfo, hw);
+        work = mount / "ubuntu-reset";
         if (!fs::exists(work)) { fs::create_directory(work); fs::permissions(work, fs::perms::owner_all); }
         secure(work);
     }
@@ -76,8 +74,22 @@ static void download(const std::string& url, const fs::path& dest, const std::st
         fs::rename(partial, dest);
     } catch (...) { std::error_code ec; fs::remove(partial, ec); throw; }
 }
+
+void require_inside(const fs::path& tree, const fs::path& path) {
+    auto base = fs::canonical(tree); auto actual = fs::weakly_canonical(path);
+    auto b = base.begin(), a = actual.begin();
+    for (; b != base.end(); ++b, ++a) need(a != actual.end() && *a == *b, "镜像路径通过符号链接越出了系统目录：" + path.string());
+}
+static void reference_paths(const fs::path& root, const fs::path& boot) {
+    for (const auto& path : {"usr/lib/os-release", "usr/bin/bash", "etc/passwd", "etc/shadow", "etc/group", "etc/fstab", "var/lib/dpkg/status",
+             "home", "usr/lib/modules", "boot", "usr/bin/sudo", "usr/bin/passwd", "usr/sbin/useradd", "usr/sbin/usermod",
+             "etc", "var/lib/dbus", "var/lib/systemd", "etc/ssh", "usr/lib/ubuntu-reset", "etc/systemd/system", "var/lib/ubuntu-reset-firstboot-ready"}) require_inside(root, root / path);
+    for (const auto& path : {"EFI", "current", "config.txt"}) require_inside(boot, boot / path);
+}
+
 static json reference(const fs::path& root, const fs::path& boot, const std::string& kind, bool prepared) {
     need(supported_platform(kind), "Unsupported platform");
+    reference_paths(root, boot);
     need(fs::is_regular_file(root / "usr/lib/os-release"), "Reference is not an installed Debian/Ubuntu filesystem");
     auto os = distribution(read(root / "usr/lib/os-release"));
     need(kind != "raspi-arm64" || os.at("id") == "ubuntu", "Native Pi firmware adapter currently requires Ubuntu; Debian ARM64 uses UEFI+GRUB");
@@ -111,15 +123,33 @@ static json reference(const fs::path& root, const fs::path& boot, const std::str
         need(cmdline && modules, "Missing Pi command line or kernel modules");
     } else {
         auto efi = efi_directory(boot, os.at("id"));
+        require_inside(boot, efi / "grub.cfg");
         auto suffix = kind == "arm64-uefi" ? "aa64" : "x64";
         need(fs::is_regular_file(root / "boot/grub/grub.cfg") && fs::is_regular_file(efi / "grub.cfg"), "Requires standard installed GRUB + distribution EFI pointer");
         need(fs::is_regular_file(efi / (std::string("grub") + suffix + ".efi")), "Missing architecture-specific GRUB EFI binary");
+        bool kernel_set = false;
+        if (fs::is_directory(root / "usr/lib/modules")) for (const auto& entry : fs::directory_iterator(root / "usr/lib/modules")) {
+            auto version = entry.path().filename().string();
+            for (const auto& file : {root / "boot" / ("vmlinuz-" + version), root / "boot" / ("initrd.img-" + version)}) require_inside(root, file);
+            if (entry.is_directory() && fs::is_regular_file(root / "boot" / ("vmlinuz-" + version)) && fs::is_regular_file(root / "boot" / ("initrd.img-" + version))) kernel_set = true;
+        }
+        need(kernel_set, "UEFI reference needs a matching installed kernel, initrd and modules directory; bootability still requires a VM/hardware test");
         // An unsigned GRUB installation is valid when Secure Boot is disabled.
         // If shim is used, its presence/validity remains the trusted profile producer's responsibility.
         for (const auto& name : {"usr/bin/sudo", "usr/bin/passwd", "usr/sbin/useradd", "usr/sbin/usermod"})
             need(fs::is_regular_file(root / name), "UEFI first-user setup requires sudo/passwd account tools: " + std::string(name));
         need(std::regex_search(read(root / "etc/group"), std::regex("(^|\n)sudo:[^:]*:[0-9]+:")), "Reference must contain the sudo administrator group");
         if (prepared) need(fs::is_regular_file(root / "var/lib/ubuntu-reset-firstboot-ready") && fs::is_regular_file(root / "usr/lib/ubuntu-reset/firstboot.sh"), "UEFI profile is missing the initial-user setup flow");
+    }
+    if (prepared) {
+        auto fstab = read(root / "etc/fstab");
+        need(fstab.find("@ROOT_UUID@") != std::string::npos && fstab.find("@BOOT_UUID@") != std::string::npos, "Profile fstab lacks relocation placeholders");
+        if (kind == "raspi-arm64") {
+            for (const auto& e : fs::recursive_directory_iterator(boot)) if (e.path().filename() == "cmdline.txt" && e.is_regular_file()) {
+                require_inside(boot, e.path()); need(read(e.path()).find("root=UUID=@ROOT_UUID@") != std::string::npos, "Pi boot command lacks relocation placeholder");
+            }
+        } else for (const auto& file : {root / "boot/grub/grub.cfg", efi_directory(boot, os.at("id")) / "grub.cfg"})
+            need(read(file).find("@ROOT_UUID@") != std::string::npos, "GRUB profile lacks root relocation placeholder");
     }
     return {{"schema", 2}, {"platform", kind}, {"distro", os.at("id")}, {"version_id", os.at("version_id")}};
 }
@@ -137,6 +167,10 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
     TempDir stage(dest.parent_path()); auto r = stage.path / "root", b = stage.path / "boot"; fs::create_directory(r); fs::create_directory(b);
     run({"rsync", "-aHAXx", "--numeric-ids", "--exclude=/dev/***", "--exclude=/proc/***", "--exclude=/sys/***", "--exclude=/run/***", "--exclude=/boot/firmware/***", "--exclude=/boot/efi/***", str(root) + "/", str(r) + "/"});
     run({"rsync", "-rt", str(boot) + "/", str(b) + "/"});
+    reference_paths(r, b);
+    for (const auto& path : {"root", "dev", "proc", "sys", "run", "boot/firmware", "boot/efi", "etc/fstab", "etc/systemd/system/multi-user.target.wants",
+             "etc/systemd/system/display-manager.service.d", "usr/lib/ubuntu-reset/firstboot.sh", "etc/systemd/system/ubuntu-reset-firstboot.service",
+             "etc/systemd/system/display-manager.service.d/ubuntu-reset-firstboot.conf"}) require_inside(r, r / path);
     // Root's personal data must not become part of an administrator-created profile.
     fs::remove_all(r / "root"); fs::create_directory(r / "root"); fs::permissions(r / "root", fs::perms::owner_all);
     for (const auto& name : {"etc/machine-id", "var/lib/dbus/machine-id"}) if (fs::exists(r / name) && !fs::is_symlink(r / name)) write(r / name, "");
@@ -161,6 +195,7 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
     } else {
         need(valid_uuid(old_uuid), "UEFI reference must use a root UUID in fstab");
         for (const auto& p : {r / "boot/grub/grub.cfg", efi_directory(b, meta.at("distro")) / "grub.cfg"}) {
+            require_inside(p == r / "boot/grub/grub.cfg" ? r : b, p);
             need(!fs::is_symlink(p), "Unsafe GRUB config symlink"); auto text = read(p);
             need(text.find(old_uuid) != std::string::npos, "Standard GRUB configs must reference the root UUID; embedded/custom layouts are unsupported");
             replace_all(text, old_uuid, "@ROOT_UUID@"); write(p, text);
@@ -181,6 +216,7 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
     for (const auto& dir : {"dev", "proc", "sys", "run", "boot/firmware", "boot/efi"}) fs::create_directories(r / dir);
     meta["provenance"] = provenance; meta["semantics"] = "initial system; all personal accounts/data removed";
     write(stage.path / "profile.json", meta.dump(2) + "\n");
+    reference(r, b, kind, true);
     run({"mksquashfs", str(stage.path), str(dest), "-noappend", "-comp", "zstd", "-processors", "2", "-no-progress"});
 }
 static void register_profile(const fs::path& profile, const Storage& st, const json& provenance) {
@@ -197,6 +233,89 @@ struct Loop {
     explicit Loop(const fs::path& image) { device = output({"losetup", "--find", "--show", "--read-only", "--partscan", str(image)}); }
     ~Loop() { try { command({"losetup", "--detach", device}, false); } catch (...) {} }
 };
+static void import_disk_image(const fs::path& image, const fs::path& profile, const Storage& st, const json& provenance) {
+    Loop loop(image); run({"udevadm", "settle"});
+    auto parts = json::parse(output({"lsblk", "--json", "-o", "PATH,FSTYPE", loop.device}));
+    std::vector<std::string> roots, boots;
+    for (const auto& p : parts.at("blockdevices")[0].value("children", json::array())) {
+        if (p["fstype"] == "ext4") roots.push_back(p["path"]);
+        if (p["fstype"] == "vfat") boots.push_back(p["path"]);
+    }
+    need(roots.size() == 1 && boots.size() == 1,
+         "镜像需要包含一个 ext4 系统分区和一个 FAT 启动分区。安装 ISO、加密盘或独立 /boot 布局目前不能导入；尚未修改当前系统。");
+    Mount root(roots[0], "ext4", "ro,noload,nosuid,nodev,noexec"), boot(boots[0], "vfat", "ro,nosuid,nodev,noexec");
+    auto os = distribution(read(root.temp.path / "usr/lib/os-release"));
+    need(os.at("id") == st.hw.at("distro"), "所选镜像与当前系统发行版不同。请选择同一发行版、CPU 架构和引导布局的初始系统镜像。");
+    make_profile(root.temp.path, boot.temp.path, st.hw.at("platform"), profile, provenance);
+}
+static void check_profile(const fs::path& profile, const Storage& st) {
+    Mount source(profile, "squashfs", "ro,loop,nosuid,nodev,noexec"); auto meta = json::parse(read(source.temp.path / "profile.json"));
+    need((meta.at("schema") == 1 || meta.at("schema") == 2) && meta.at("platform") == st.hw["platform"], "Profile platform does not match target");
+    auto actual = reference(source.temp.path / "root", source.temp.path / "boot", st.hw["platform"], true);
+    need(actual.at("distro") == st.hw.at("distro"), "Recovery source must match the running distribution; cross-distribution replacement is unsupported");
+    need(meta.at("schema") == 2 ? meta.at("distro") == actual.at("distro") : actual.at("distro") == "ubuntu", "Profile metadata does not match its root distribution");
+    need(read(source.temp.path / "root/etc/fstab").find("@ROOT_UUID@") != std::string::npos, "Factory profile is not relocatable");
+}
+static void snapshot_local_file(const fs::path& from, const fs::path& to) {
+    int in = open(from.c_str(), O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC); need(in >= 0, "无法打开本地镜像文件");
+    int out = -1;
+    try {
+        struct stat st{}; need(fstat(in, &st) == 0 && S_ISREG(st.st_mode) && st.st_size > 0, "请选择普通镜像文件，不要选择磁盘设备或目录");
+        need(static_cast<uint64_t>(st.st_size) <= (128ULL << 30), "本地镜像超过 128 GiB 限制");
+        need(fs::space(to.parent_path()).available > static_cast<uint64_t>(st.st_size) + (1ULL << 30), "恢复分区空间不足，无法暂存所选镜像");
+        out = open(to.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0600); need(out >= 0, "无法暂存镜像");
+        std::vector<char> buffer(1024 * 1024); uint64_t total = 0;
+        for (;;) {
+            auto n = ::read(in, buffer.data(), buffer.size()); if (n < 0 && errno == EINTR) continue;
+            need(n >= 0, "读取镜像失败"); if (!n) break;
+            total += static_cast<uint64_t>(n); need(total <= static_cast<uint64_t>(st.st_size), "复制期间镜像文件发生变化，请停止其他程序写入该文件后重试");
+            ssize_t offset = 0;
+            while (offset < n) { auto count = ::write(out, buffer.data() + offset, static_cast<size_t>(n - offset));
+                if (count < 0 && errno == EINTR) continue;
+                need(count > 0, "写入暂存镜像失败"); offset += count;
+            }
+        }
+        need(total == static_cast<uint64_t>(st.st_size), "复制期间镜像文件大小发生变化，请重试");
+        need(fsync(out) == 0, "镜像暂存写入失败"); close(out); out = -1; close(in);
+    } catch (...) { close(in); if (out >= 0) close(out); throw; }
+}
+void prepare_image(const fs::path& selected, const fs::path& location) {
+    root_only(); no_pending(); auto format = image_format(selected); Storage st(location); TempDir temp(st.work);
+    auto snapshot = temp.path / "input", raw = temp.path / "disk.raw", profile = temp.path / "prepared.squashfs";
+    snapshot_local_file(selected, snapshot);
+    json provenance{{"type", "local image"}, {"filename", selected.filename().string()}, {"sha256", sha256(snapshot)}, {"format", format},
+                    {"authentication", "User-selected local file; computed hash is integrity tracking, not proof of publisher identity"}};
+    if (format == "profile") {
+        check_profile(snapshot, st); register_profile(snapshot, st, provenance); return;
+    }
+    if (format == "raw-xz") {
+        auto listing = output({"xz", "--robot", "--list", snapshot.string()});
+        std::istringstream lines(listing); std::string line; uint64_t expanded = 0;
+        while (std::getline(lines, line)) if (line.starts_with("totals\t")) {
+            std::istringstream cols(line); std::string a,b,c,d; cols >> a >> b >> c >> d >> expanded;
+        }
+        need(expanded && expanded < (128ULL << 30) && fs::space(st.work).available > expanded * 2 + (2ULL << 30), "镜像展开或生成恢复资料所需空间不足，或镜像过大");
+        int fd = open(raw.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600); need(fd >= 0, "无法展开本地镜像");
+        auto rc = command({"xz", "--decompress", "--stdout", snapshot.string()}, false, fd).code; close(fd); need(rc == 0, "镜像解压失败");
+    } else if (format == "qcow2") {
+        auto info = json::parse(output({"qemu-img", "info", "--output=json", "-f", "qcow2", snapshot.string()}));
+        need(!info.contains("backing-filename") && !info.contains("full-backing-filename") && !info.value("encrypted", false), "请先导出独立、未加密的完整虚拟磁盘镜像，不能使用增量快照");
+        auto data = info.value("format-specific", json::object()).value("data", json::object());
+        need(!data.contains("data-file"), "不支持依赖外部数据文件的虚拟磁盘");
+        uint64_t size = info.at("virtual-size");
+        need(size < (128ULL << 30) && fs::space(st.work).available > size * 2 + (2ULL << 30), "虚拟磁盘展开空间不足，或镜像过大");
+        run({"qemu-img", "convert", "-f", "qcow2", "-O", "raw", snapshot.string(), raw.string()});
+    } else raw = snapshot;
+    import_disk_image(raw, profile, st, provenance); register_profile(profile, st, provenance);
+}
+json detected_sources() {
+    try { auto os = distribution(read("/usr/lib/os-release")); auto model = fs::exists("/proc/device-tree/model") ? read("/proc/device-tree/model") : ""; return source_capabilities(os.at("id"), os.at("version_id"), select_platform(machine(), fs::exists("/sys/firmware/efi"), model, os.at("id"))); }
+    catch (const Error& e) { return {{"automatic_available", false}, {"reason", e.what()}, {"iso_automatic_install", false}}; }
+}
+void prepare_automatic(const fs::path& location) {
+    root_only(); auto sources = detected_sources(); need(sources.at("automatic_available").get<bool>(), sources.at("reason"));
+    prepare_pi(sources.at("automatic_release"), location);
+}
 void prepare_pi(const std::string& release, const fs::path& location) {
     root_only(); no_pending(); Storage st(location); need(st.hw["platform"] == "raspi-arm64", "Official Pi images are only supported on Raspberry Pi 5");
     need(std::regex_match(release, std::regex("[0-9]{2}\\.[0-9]{2}(\\.[0-9]+)?")), "Invalid Ubuntu release");
@@ -237,14 +356,7 @@ void prepare_pi(const std::string& release, const fs::path& location) {
 void prepare_profile(const std::string& url, const std::string& sum, const fs::path& location) {
     root_only(); no_pending(); need(valid_sha(sum), "Provide an independently trusted SHA-256 for the factory profile"); Storage st(location);
     auto profile = st.work / ("download-" + sum + ".squashfs"); download(url, profile, sum);
-    {
-        Mount source(profile, "squashfs", "ro,loop,nosuid,nodev,noexec"); auto meta = json::parse(read(source.temp.path / "profile.json"));
-        need((meta.at("schema") == 1 || meta.at("schema") == 2) && meta.at("platform") == st.hw["platform"], "Profile platform does not match target");
-        auto actual = reference(source.temp.path / "root", source.temp.path / "boot", st.hw["platform"], true);
-        need(actual.at("distro") == st.hw.at("distro"), "Recovery source must match the running distribution; cross-distribution replacement is unsupported");
-        need(meta.at("schema") == 2 ? meta.at("distro") == actual.at("distro") : actual.at("distro") == "ubuntu", "Profile metadata does not match its root distribution");
-        need(read(source.temp.path / "root/etc/fstab").find("@ROOT_UUID@") != std::string::npos, "Factory profile is not relocatable");
-    }
+    check_profile(profile, st);
     register_profile(profile, st, {{"url", url}, {"sha256", sum}});
 }
 fs::path preflight(const json& s) {
@@ -256,7 +368,8 @@ fs::path preflight(const json& s) {
     secure(path); need(sha256(path) == s.at("sha256").get<std::string>(), "Recovery profile is damaged or changed"); return path;
 }
 void plan(const json& s) {
-    root_only(); Mount source(preflight(s), "squashfs", "ro,loop,nosuid,nodev,noexec");
+    root_only(); std::cout << "正在检查恢复磁盘与镜像完整性，这一步可能需要一些时间。\n" << std::flush;
+    Mount source(preflight(s), "squashfs", "ro,loop,nosuid,nodev,noexec");
     std::cout << "ROOT: this preview includes removal of all personal users and files.\n" << std::flush;
     run({"rsync", "-aHAXxnci", "--numeric-ids", "--delete", "--exclude=/dev/***", "--exclude=/proc/***", "--exclude=/sys/***", "--exclude=/run/***", "--exclude=/boot/firmware/***", "--exclude=/boot/efi/***", "--exclude=/var/lib/ubuntu-reset/***", str(source.temp.path / "root") + "/", "/"});
     auto boot = s["platform"] == "raspi-arm64" ? "/boot/firmware/" : "/boot/efi/";
