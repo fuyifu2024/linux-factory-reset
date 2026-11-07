@@ -17,4 +17,4 @@ printf '\n127.0.0.1 releases.ubuntu.com\n' >>/etc/hosts
 server=$!
 sleep 1
 # Explicitly bypass CI proxy variables: this test MUST reach only the loopback fixture.
-HTTPS_PROXY= HTTP_PROXY= ALL_PROXY= https_proxy= http_proxy= all_proxy= "$app" "$fixture"
+env -u HTTPS_PROXY -u HTTP_PROXY -u ALL_PROXY -u https_proxy -u http_proxy -u all_proxy "$app" "$fixture"

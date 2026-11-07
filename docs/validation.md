@@ -12,7 +12,7 @@
 
 **没有执行的验证：**完整官方大镜像下载/导入、真实 initramfs 启动恢复、真实 x86/OEM 恢复资料、首次开机向导、物理 BIOS 重置、断电/磁盘故障恢复及耗时基准。GUI 只验证了配置输出，尚未进行人工交互验收。
 
-GitHub CI 分别在 Ubuntu 24.04 x86_64 和 ARM64 上构建、运行相同安全测试并产生二进制及 DEB。CI 的结果不代表真实硬件恢复已通过验收；请以 [Actions](https://github.com/fuyifu2024/ubuntu-reset/actions) 中对应提交的结果为准。
+GitHub CI 分别在 Ubuntu 24.04 x86_64 和 ARM64 上构建、运行相同安全测试并产生二进制及 DEB。CI 的结果不代表真实硬件恢复已通过验收；请以 [Actions](https://github.com/fuyifu2024/linux-factory-reset/actions) 中对应提交的结果为准。
 
 整个开发过程中没有在当前工作机器上安装本工具、设置待恢复标记、修改启动文件、执行系统恢复或 BIOS 重置。
 
@@ -23,3 +23,19 @@ GitHub CI 分别在 Ubuntu 24.04 x86_64 和 ARM64 上构建、运行相同安全
 CI 扩展为 Ubuntu 24.04、Debian 12、Debian 13 × amd64/ARM64 六组容器，除编译/测试/打包外，还在各容器实际安装 DEB，检查版本、状态、配套脚本和未设置恢复标记。OpenSSL 依赖按各容器的发行版自动计算。它是隔离容器中的安装测试，**不是 UEFI VM 启动/恢复测试**。源/目标恢复、固件和首次开户的真机限制仍与上文一致。
 
 New checks cover distro identification, generic ARM64 UEFI selection, distro/CPU-aware profile creation, EFI relocation, legacy state compatibility and rejection of unsupported layouts. CI spans six distro/architecture combinations and installs packages only inside disposable containers without arming reset. Container and directory-fixture tests do not validate hardware reboot, initial setup, BIOS defaults or power-loss recovery.
+
+## v0.3.0-alpha.1 / Linux Factory Reset
+
+本节描述新版验证方法，实际通过情况以对应提交的 CI 记录及发布验收记录为准。先前版本中的测试数量和 GUI 限制是历史记录，不能当作本版结果。
+
+- 六组发行版/架构容器：构建、CTest、ShellCheck、DEB 安装、旧命令兼容、无待恢复标记。
+- HTTPS 集成：仅在可丢弃 CI 容器里建立本地 TLS 服务和临时信任证书，实际运行 libcurl，检查元数据解析、文件下载、SHA-256 不匹配、同名文件保护、传输取消及临时文件清理。该测试脚本会改容器的信任库与 hosts，**不要在真实系统执行 `tests/https.sh`**。
+- 图形：无 GPU 的 Xvfb 中以普通用户启动真实 Zenity 界面，检查 EGL/Zink 警告；另以确定性对话框替身驱动真实 GUI 控制器中的“未准备即查看变更”路径。后者不是人工 GUI 全流程验收，`tests/gui-flow.sh` 也仅供隔离容器执行。
+- 系统树：合成内核/initrd/EFI 文件仅用于验证文件布局、UUID 替换、账户删除与路径边界，不会执行，不能证明可启动。
+- 新增安全回归：父目录符号链接越界、旧 UUID 遗留、输出大小限制、官方元数据版本筛选、禁止把 ISO 下载当作恢复就绪。
+
+远程 CI 负责构建和测试，避免继续给用户树莓派施加编译/镜像负载。没有在当前机器执行恢复、安装本工具或修改启动标记。
+
+剩余未验证：完整真实官方大镜像导入、真实 initramfs 启动恢复与首次开户、Fedora 恢复引擎、ISO 自动安装、断电/磁盘故障。请勿把容器测试或二进制静态检查称为这些能力的验收。
+
+The new checks use six disposable distro/architecture containers, a real local HTTPS fixture, a GPU-less GUI launch, a deterministic dialog double and synthetic filesystem fixtures. None establishes a bootable real-machine restore. HTTPS and GUI-double scripts mutate their disposable container and must not run on a real user host.

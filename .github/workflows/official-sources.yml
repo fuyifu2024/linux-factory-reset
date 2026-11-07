@@ -1,0 +1,33 @@
+name: Check live official metadata
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libcurl4-openssl-dev nlohmann-json3-dev
+      - name: Build downloader (remote runner only)
+        run: cmake -S . -B build -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release && cmake --build build -j2
+      - name: Resolve current official URLs, never download images
+        run: |
+          mkdir -p evidence
+          build/linux-factory-reset resolve --distro fedora --release stable --edition workstation --arch arm64 > evidence/fedora-arm64.json
+          sleep 6
+          build/linux-factory-reset resolve --distro fedora --release stable --edition workstation --arch amd64 > evidence/fedora-amd64.json
+          sleep 6
+          build/linux-factory-reset resolve --distro ubuntu --release 26.04 --edition desktop --arch arm64 > evidence/ubuntu-arm64.json
+          sleep 6
+          build/linux-factory-reset resolve --distro ubuntu --release 26.04 --edition desktop --arch amd64 > evidence/ubuntu-amd64.json
+          sleep 6
+          build/linux-factory-reset resolve --distro debian --release stable --edition netinst --arch arm64 > evidence/debian-arm64.json
+          sleep 6
+          build/linux-factory-reset resolve --distro debian --release stable --edition netinst --arch amd64 > evidence/debian-amd64.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: official-metadata-evidence
+          path: evidence/*.json
