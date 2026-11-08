@@ -84,6 +84,10 @@ int main() {
         auto safe = tmp.path / "containment", outside = tmp.path / "outside"; fs::create_directory(safe); fs::create_directory(outside);
         fs::create_directory_symlink(outside, safe / "escape");
         rejects([&] {require_inside(safe, safe / "escape/new-file");}, "ancestor symlink cannot escape staging root");
+        fs::create_symlink(outside / "not-created", safe / "dangling");
+        rejects([&] {require_inside(safe, safe / "dangling");}, "dangling output symlink cannot create a host file");
+        fs::create_symlink("cycle", safe / "cycle");
+        rejects([&] {require_inside(safe, safe / "cycle");}, "symlink cycles fail closed");
         fs::create_directory(safe / "usr"); fs::create_directory(safe / "usr/lib"); fs::create_directory_symlink("usr/lib", safe / "lib");
         require_inside(safe, safe / "lib/new-file"); ++checks;
         write(tmp.path / "hash", "abc");

@@ -1,6 +1,7 @@
 #include "reset.hpp"
 #include "download.hpp"
 #include <chrono>
+#include <deque>
 #include <cerrno>
 #include <fcntl.h>
 #include <iostream>
@@ -77,7 +78,26 @@ static void download(const std::string& url, const fs::path& dest, const std::st
 }
 
 void require_inside(const fs::path& tree, const fs::path& path) {
-    auto base = fs::canonical(tree); auto actual = fs::weakly_canonical(path);
+    auto base = fs::canonical(tree); auto absolute = fs::absolute(path);
+    fs::path actual = absolute.root_path(); std::deque<fs::path> pending;
+    for (const auto& component : absolute.relative_path()) pending.push_back(component);
+    unsigned links = 0;
+    while (!pending.empty()) {
+        auto component = pending.front(); pending.pop_front();
+        if (component.empty() || component == ".") continue;
+        if (component == "..") { if (actual != actual.root_path()) actual = actual.parent_path(); continue; }
+        auto next = actual / component; std::error_code ec;
+        auto status = fs::symlink_status(next, ec);
+        need(!ec || ec == std::errc::no_such_file_or_directory || ec == std::errc::not_a_directory, "Cannot inspect reference path: " + next.string());
+        if (fs::is_symlink(status)) {
+            need(++links <= 40, "Reference path has a symlink loop");
+            auto target = fs::read_symlink(next);
+            if (target.is_absolute()) actual = target.root_path();
+            std::vector<fs::path> components;
+            for (const auto& part : target.relative_path()) components.push_back(part);
+            for (auto i = components.rbegin(); i != components.rend(); ++i) pending.push_front(*i);
+        } else actual = next;
+    }
     auto b = base.begin(), a = actual.begin();
     for (; b != base.end(); ++b, ++a) need(a != actual.end() && *a == *b, "镜像路径通过符号链接越出了系统目录：" + path.string());
 }
