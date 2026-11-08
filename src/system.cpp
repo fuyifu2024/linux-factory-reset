@@ -84,7 +84,7 @@ void require_inside(const fs::path& tree, const fs::path& path) {
 static void reference_paths(const fs::path& root, const fs::path& boot) {
     for (const auto& path : {"usr/lib/os-release", "usr/bin/bash", "etc/passwd", "etc/shadow", "etc/group", "etc/fstab", "var/lib/dpkg/status",
              "home", "usr/lib/modules", "boot", "usr/bin/sudo", "usr/bin/passwd", "usr/sbin/useradd", "usr/sbin/usermod",
-             "etc", "var/lib/dbus", "var/lib/systemd", "etc/ssh", "usr/lib/ubuntu-reset", "etc/systemd/system", "var/lib/ubuntu-reset-firstboot-ready"}) require_inside(root, root / path);
+             "etc", "var/lib/dbus", "var/lib/systemd", "etc/ssh", "usr/lib/ubuntu-reset", "etc/systemd/system", "var/lib/ubuntu-reset-firstboot-ready", "usr/lib/sysimage/rpm/rpmdb.sqlite", "etc/kernel/cmdline", ".autorelabel"}) require_inside(root, root / path);
     for (const auto& path : {"EFI", "current", "config.txt"}) require_inside(boot, boot / path);
 }
 
@@ -267,7 +267,7 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
         fs::permissions(r / "etc/netplan/90-factory.yaml", fs::perms::owner_read | fs::perms::owner_write);
     }
     if (meta.at("distro") == "fedora") {
-        require_inside(r, r / "etc/kernel/cmdline"); write(r / "etc/kernel/cmdline", "root=UUID=@ROOT_UUID@ ro\n");
+        require_inside(r, r / "etc/kernel/cmdline"); fs::create_directories(r / "etc/kernel"); write(r / "etc/kernel/cmdline", "root=UUID=@ROOT_UUID@ ro\n");
         write(r / ".autorelabel", "-F\n");
     }
     // Empty runtime mountpoint directories are needed for the next boot.

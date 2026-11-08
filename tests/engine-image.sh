@@ -5,7 +5,7 @@ set -euo pipefail
 distro=$1 fault=$2
 mkdir -p evidence
 evidence=$PWD/evidence
-work=$(mktemp -d /var/tmp/lfr-engine.XXXXXX)
+work=$(mktemp -d /var/lib/lfr-engine.XXXXXX)
 loop=''
 cleanup() {
     umount "$work/root" 2>/dev/null || :

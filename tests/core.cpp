@@ -71,6 +71,11 @@ int main() {
         releases[2]["link"] = "https://download.fedoraproject.org/pub/Fedora-44.iso";
         releases.push_back(releases[2]);
         rejects([&] {parse_fedora(releases.dump(), "arm64", "workstation");}, "ambiguous same-version Fedora image rejected");
+        auto recovery_json = json::array({{{"version", "45"}, {"arch", "aarch64"}, {"variant", "Cloud"}, {"link", "https://download.fedoraproject.org/pub/fedora/linux/releases/45/Cloud/aarch64/images/Fedora-Cloud-Base-Generic-45-1.4.aarch64.qcow2"}, {"sha256", std::string(64,'d')}}});
+        check(parse_fedora_recovery(recovery_json.dump(), "arm64", "45").automatic_restore, "Fedora Generic image is an actual recovery source");
+        rejects([&] {parse_fedora_recovery(recovery_json.dump(), "arm64", "44");}, "Fedora automatic recovery never silently upgrades the release");
+        recovery_json.push_back(recovery_json[0]);
+        rejects([&] {parse_fedora_recovery(recovery_json.dump(), "arm64", "45");}, "duplicate recovery source rejected");
         // A cancellation before networking must delete the private .part and publish nothing.
         bool cancelled = false;
         try {download_official(official, tmp.path, [](const TransferProgress&) {return false;});} catch (const Cancelled&) {cancelled = true;}
@@ -161,26 +166,29 @@ int main() {
         rejects([&] {make_profile(r, b, "raspi-arm64", tmp.path / "bad.squashfs", {});}, "personal reference rejected");
         // Build real Squashfs profiles for both distros/architectures from synthetic,
         // non-executable file trees. No firmware or running root is modified.
-        for (const auto& distro_version : {std::pair<std::string, std::string>{"ubuntu", "24.04"}, {"debian", "12"}, {"debian", "13"}}) {
+        for (const auto& distro_version : {std::pair<std::string, std::string>{"ubuntu", "24.04"}, {"debian", "12"}, {"debian", "13"}, {"fedora", "45"}}) {
             for (const std::string platform : {"arm64-uefi", "x86_64-uefi"}) {
                 const auto& [distro, version] = distro_version;
+                auto grubpath = distro == "fedora" ? "boot/grub2/grub.cfg" : "boot/grub/grub.cfg";
                 auto base = tmp.path / (distro + version + platform);
                 auto ur = base / "reference", ub = base / "esp";
                 for (const auto& dir : {"etc", "usr/bin", "usr/sbin", "usr/lib", "var/lib/dpkg", "boot/grub", "home"}) fs::create_directories(ur / dir);
                 fs::create_directories(ur / "usr/lib/modules/fixture");
+                fs::create_directories(ur / "boot/grub2"); fs::create_directories(ur / "usr/lib/sysimage/rpm");
                 write(ur / "boot/vmlinuz-fixture", "synthetic kernel, never executed");
-                write(ur / "boot/initrd.img-fixture", "synthetic initrd, never executed");
+                write(ur / (distro == "fedora" ? "boot/initramfs-fixture.img" : "boot/initrd.img-fixture"), "synthetic initrd, never executed");
                 auto efi = efi_directory(ub, distro); fs::create_directories(efi);
                 auto image_elf = elf; image_elf[18] = platform == "arm64-uefi" ? static_cast<char>(183) : static_cast<char>(62);
                 write(ur / "usr/bin/bash", image_elf);
                 write(ur / "usr/lib/os-release", "ID=" + distro + "\nVERSION_ID=\"" + version + "\"\n");
                 write(ur / "etc/passwd", "root:x:0:0:root:/root:/bin/bash\n");
                 write(ur / "etc/shadow", "root:!:1:0:99999:7:::\n");
-                write(ur / "etc/group", "root:x:0:\nsudo:x:27:\n");
+                write(ur / "etc/group", "root:x:0:\nsudo:x:27:\nwheel:x:10:\n");
                 write(ur / "etc/fstab", "UUID=01234567-abcd / ext4 defaults 0 1\nUUID=ABCD-1234 /boot/efi vfat defaults 0 2\n");
+                write(ur / "usr/lib/sysimage/rpm/rpmdb.sqlite", "synthetic fixture database");
                 write(ur / "var/lib/dpkg/status", "Package: base-files\nStatus: install ok installed\n");
                 for (const auto& tool : {"usr/bin/sudo", "usr/bin/passwd", "usr/sbin/useradd", "usr/sbin/usermod"}) write(ur / tool, image_elf);
-                write(ur / "boot/grub/grub.cfg", "linux /boot/vmlinuz root=UUID=01234567-abcd ro\n");
+                write(ur / grubpath, "linux /boot/vmlinuz root=UUID=01234567-abcd ro\n");
                 write(efi / "grub.cfg", "search.fs_uuid 01234567-abcd root\nset prefix=($root)/boot/grub\n");
                 auto loader = efi / (platform == "arm64-uefi" ? "grubaa64.efi" : "grubx64.efi");
                 write(loader, "synthetic loader fixture; never executed");
@@ -192,7 +200,7 @@ int main() {
                 check(meta.at("version_id") == version, "reference distribution version retained");
                 validate_reference(extracted / "root", extracted / "boot", platform, true); ++checks;
                 check(read(efi_directory(extracted / "boot", distro) / "grub.cfg").find("@ROOT_UUID@") != std::string::npos, "correct distributor EFI pointer relocatable");
-                check(read(extracted / "root/boot/grub/grub.cfg").find("@ROOT_UUID@") != std::string::npos, "UEFI root menu relocatable");
+                check(read(extracted / "root" / grubpath).find("@ROOT_UUID@") != std::string::npos, "UEFI root menu relocatable");
                 check(fs::read_symlink(extracted / "root/etc/systemd/system/systemd-firstboot.service") == "/dev/null", "stock firstboot cannot block the project first-user flow");
                 check(fs::is_symlink(extracted / "root/etc/systemd/system/multi-user.target.wants/ubuntu-reset-firstboot.service"), "generic UEFI first-user wizard enabled");
                 check(read(ur / "etc/fstab").find("01234567-abcd") != std::string::npos, "original reference left unchanged");
@@ -202,9 +210,9 @@ int main() {
                 auto mask = extracted / "root/etc/systemd/system/systemd-firstboot.service"; fs::remove(mask);
                 rejects([&] {validate_reference(extracted / "root", extracted / "boot", platform, true);}, "legacy profile with competing firstboot wizard rejected");
                 fs::create_symlink("/dev/null", mask);
-                write(extracted / "root/boot/grub/grub.cfg", "linux /vmlinuz root=PARTUUID=source-1234\n# @ROOT_UUID@ in a comment is insufficient\n");
+                write(extracted / "root" / grubpath, "linux /vmlinuz root=PARTUUID=source-1234\n# @ROOT_UUID@ in a comment is insufficient\n");
                 rejects([&] {validate_reference(extracted / "root", extracted / "boot", platform, true);}, "a comment placeholder does not make the kernel relocatable");
-                write(extracted / "root/boot/grub/grub.cfg", "root=UUID=unrelocated\n");
+                write(extracted / "root" / grubpath, "root=UUID=unrelocated\n");
                 rejects([&] {validate_reference(extracted / "root", extracted / "boot", platform, true);}, "prepared GRUB without placeholder rejected");
                 fs::create_directory_symlink(outside, ur / "etc/systemd");
                 rejects([&] {make_profile(ur, ub, platform, base / "escape.squashfs", {}, UFRESET_TEST_ASSETS);}, "malicious directory symlink rejected before staging writes");

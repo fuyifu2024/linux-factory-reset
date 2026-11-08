@@ -89,7 +89,7 @@ if [[ $REC_FAULT != none ]]; then
     if [[ $REC_FAULT == failure ]]; then
         sed -i '/uf_relocate .*Cannot relocate/a uf_fail "expected QA write failure"' /usr/lib/ubuntu-reset/restore.sh
     else
-        sed -i '/echo .*removing users/data/a rm -rf "$UF_TARGET/boot" "$UF_TARGET/usr"; sync; echo LFR_VM_POWER_CUT_READY >/dev/console; sleep 600' /usr/lib/ubuntu-reset/restore.sh
+        sed -i '/echo .*removing users/a rm -rf "$UF_TARGET/boot" "$UF_TARGET/usr"; sync; echo LFR_VM_POWER_CUT_READY >/dev/console; sleep 600' /usr/lib/ubuntu-reset/restore.sh
     fi
 fi
 useradd --create-home --shell /bin/bash lfr_old_user

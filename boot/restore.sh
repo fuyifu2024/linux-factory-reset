@@ -29,7 +29,15 @@ uf_finish() {
         printf '%s\n' "$1" >"$UF_RESCUE/result" || return 1
         rm -f "$UF_RESCUE/active" || return 1
         sync
-        uf_normal_order || echo 'Select the normal OS entry if firmware ignores BootOrder' >/dev/console
+        if uf_normal_order; then
+            uf_entry=$(cat "$UF_RESCUE/entry") || return 1
+            case "$uf_entry" in ''|*[!0-9A-Fa-f]*) return 1 ;; esac
+            if efibootmgr --bootnum "$uf_entry" --delete-bootnum; then
+                rm -rf /run/uf-boot/EFI/LinuxFactoryReset || return 1
+            fi
+        else
+            echo 'Select the normal OS entry if firmware ignores BootOrder' >/dev/console
+        fi
     fi
     return 0
 }
