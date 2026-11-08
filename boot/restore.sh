@@ -99,7 +99,7 @@ done
 mkdir -p /run/uf-store /run/uf-source /run/uf-boot
 mount -t ext4 -o rw "$UF_STORE_DEV" /run/uf-store || uf_fail 'Cannot mount recovery partition'
 if [ "$UF_PLATFORM" != raspi-arm64 ]; then
-    [ -d "$UF_RESCUE" ] && [ ! -L "$UF_RESCUE" ] || uf_fail 'Missing independent rescue directory'
+    if [ ! -d "$UF_RESCUE" ] || [ -L "$UF_RESCUE" ]; then uf_fail 'Missing independent rescue directory'; fi
     [ "$(stat -c '%u:%a' "$UF_RESCUE")" = 0:700 ] || uf_fail 'Unsafe rescue directory'
     [ "$(cat "$UF_RESCUE/active")" = "$UF_ID" ] || uf_fail 'Recovery transaction is not active'
 fi

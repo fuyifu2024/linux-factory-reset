@@ -291,7 +291,7 @@ struct Loop {
     explicit Loop(const fs::path& image) { device = output({"losetup", "--find", "--show", "--read-only", "--partscan", str(image)}); }
     ~Loop() { try { command({"losetup", "--detach", device}, false); } catch (...) {} }
 };
-static void import_disk_image(const fs::path& image, const fs::path& profile, const Storage& st, const json& provenance) {
+static void import_disk_image(const fs::path& image, const fs::path& profile, const fs::path& work, const std::string& platform, const std::string& distro_expected, const json& provenance) {
     Loop loop(image); run({"udevadm", "settle"});
     auto parts = json::parse(output({"lsblk", "--json", "--tree", "-o", "PATH,FSTYPE", loop.device}));
     std::vector<std::string> roots, boots, btrfs;
@@ -302,7 +302,7 @@ static void import_disk_image(const fs::path& image, const fs::path& profile, co
     }
     need(boots.size() == 1 && ((roots.size() >= 1 && roots.size() <= 2 && btrfs.empty()) || (roots.empty() && btrfs.size() == 1)), "Source needs an installed ext4 or Fedora Btrfs system plus one FAT ESP");
     Mount boot(boots[0], "vfat", "ro,nosuid,nodev,noexec");
-    TempDir merged(st.work); auto tree = merged.path / "root", esp = merged.path / "esp"; fs::create_directory(tree); fs::create_directory(esp);
+    TempDir merged(work); auto tree = merged.path / "root", esp = merged.path / "esp"; fs::create_directory(tree); fs::create_directory(esp);
     run({"rsync", "-rt", boot.temp.path.string()+"/", esp.string()+"/"});
     std::string root_uuid; bool found_root = false, found_boot = false;
     auto copy_tree = [&](const fs::path& source, const fs::path& dest) {
@@ -324,14 +324,14 @@ static void import_disk_image(const fs::path& image, const fs::path& profile, co
     }
     need(found_root && valid_uuid(root_uuid), "No unambiguous installed root in source image");
     auto os = distribution(read(tree / "usr/lib/os-release"));
-    need(os.at("id") == st.hw.at("distro"), "所选镜像与当前系统发行版不同。");
+    need(os.at("id") == distro_expected, "所选镜像与当前系统发行版不同。");
     if (roots.size() == 2) for (const auto& dev : roots) {
         Mount source(dev, "ext4", "ro,noload,nosuid,nodev,noexec");
         if (fs::is_regular_file(source.temp.path / "usr/lib/os-release")) continue;
         need(!found_boot && fs::is_directory(source.temp.path / "grub"), "Extra source partition is not a standard Ubuntu /boot");
         copy_tree(source.temp.path, tree / "boot"); found_boot = true;
     }
-    reference(tree, esp, st.hw.at("platform"), false);
+    reference(tree, esp, platform, false);
     for (const auto& p : {"etc/default/grub", "etc/kernel/cmdline", "boot/grub/grub.cfg", "boot/grub2/grub.cfg", "dev", "proc", "sys"}) require_inside(tree, tree / p);
     // Normalize source-only split boot/subvolumes into the explicitly supported flat ext4 target.
     // Nothing is written to the currently installed root during this operation.
@@ -351,7 +351,7 @@ static void import_disk_image(const fs::path& image, const fs::path& profile, co
     write(efi_directory(esp, distro) / "grub.cfg", pointer);
     if (fs::is_regular_file(esp / "EFI/BOOT/grub.cfg")) write(esp / "EFI/BOOT/grub.cfg", pointer);
     if (distro == "fedora") {
-        need(host_arch() == (st.hw.at("platform") == "x86_64-uefi" ? "amd64" : "arm64"), "Fedora initramfs conversion requires native source architecture");
+        need(host_arch() == (platform == "x86_64-uefi" ? "amd64" : "arm64"), "Fedora initramfs conversion requires native source architecture");
         // Official generic dracut images contain Btrfs subvolume cmdlines. Rebuild from
         // the pristine staged userspace, never from this machine's personal configuration.
         fs::create_directories(tree / "dev"); fs::create_directories(tree / "proc");
@@ -370,7 +370,12 @@ static void import_disk_image(const fs::path& image, const fs::path& profile, co
         write(tree / "etc/default/grub", "GRUB_ENABLE_BLSCFG=false\nGRUB_TIMEOUT=3\nGRUB_CMDLINE_LINUX=\"\"\n");
         write(tree / "etc/kernel/cmdline", "root=UUID="+root_uuid+" ro\n");
     }
-    make_profile(tree, esp, st.hw.at("platform"), profile, provenance);
+    make_profile(tree, esp, platform, profile, provenance);
+}
+void make_profile_image(const fs::path& selected, const std::string& platform, const std::string& distro, const fs::path& out) {
+    root_only(); need(supported_platform(platform) && platform != "raspi-arm64", "Image conversion needs a generic UEFI platform");
+    need(!fs::exists(out) && fs::is_regular_file(selected) && !fs::is_symlink(selected), "Use a regular offline raw image and a new output path"); secure(out.parent_path());
+    import_disk_image(selected, out, out.parent_path(), platform, distro, {{"type", "offline installed image conversion"}, {"sha256", sha256(selected)}});
 }
 static void check_profile(const fs::path& profile, const Storage& st) {
     Mount source(profile, "squashfs", "ro,loop,nosuid,nodev,noexec"); auto meta = json::parse(read(source.temp.path / "profile.json"));
@@ -441,7 +446,7 @@ void prepare_image(const fs::path& selected, const fs::path& location, const std
         need(size < (128ULL << 30) && fs::space(st.work).available > size * 2 + (2ULL << 30), "虚拟磁盘展开空间不足，或镜像过大");
         run({"qemu-img", "convert", "-f", "qcow2", "-O", "raw", snapshot.string(), raw.string()});
     } else raw = snapshot;
-    import_disk_image(raw, profile, st, provenance); register_profile(profile, st, provenance);
+    import_disk_image(raw, profile, st.work, st.hw.at("platform"), st.hw.at("distro"), provenance); register_profile(profile, st, provenance);
 }
 json detected_sources() {
     try { auto os = distribution(read("/usr/lib/os-release")); auto model = fs::exists("/proc/device-tree/model") ? read("/proc/device-tree/model") : ""; return source_capabilities(os.at("id"), os.at("version_id"), select_platform(machine(), fs::exists("/sys/firmware/efi"), model, os.at("id"))); }

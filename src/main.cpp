@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
             {"download", {"--distro", "--release", "--edition", "--arch", "--directory", "--proxy"}},
             {"prepare-image", {"--file", "--storage", "--sha256", "--sha512"}}, {"prepare-auto", {"--storage", "--proxy"}},
             {"prepare-pi", {"--release", "--storage", "--proxy"}}, {"prepare-profile", {"--url", "--sha256", "--storage", "--proxy"}},
+            {"make-profile-image", {"--file", "--platform", "--distro", "--output"}},
             {"make-profile", {"--root", "--boot", "--platform", "--output"}},
             {"arm", {"--confirm", "--reboot"}}, {"reset-firmware", {"--confirm"}}};
         uf::need(allowed.contains(cmd), "Unknown command; use --help"); std::map<std::string, std::string> options;
@@ -86,6 +87,7 @@ int main(int argc, char** argv) {
         else if (cmd == "arm") uf::arm(uf::load_state(), get("--confirm"), options.contains("--reboot"));
         else if (cmd == "cancel") uf::cancel();
         else if (cmd == "reset-firmware") uf::firmware_reset(get("--confirm"));
+        else if (cmd == "make-profile-image") uf::make_profile_image(uf::fs::canonical(get("--file")), get("--platform"), get("--distro"), uf::fs::absolute(get("--output")));
         else if (cmd == "make-profile") {
             auto root = uf::fs::canonical(get("--root")); auto boot = uf::fs::canonical(get("--boot"));
             struct stat live{}, source{};

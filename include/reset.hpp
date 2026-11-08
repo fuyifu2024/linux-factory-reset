@@ -73,6 +73,7 @@ void firmware_reset(const std::string& confirm);
 void make_profile(const fs::path& root, const fs::path& boot, const std::string& platform,
                   const fs::path& destination, const json& provenance,
                   const fs::path& firstboot_assets = "/usr/lib/ubuntu-reset");
+void make_profile_image(const fs::path& selected, const std::string& platform, const std::string& distro, const fs::path& out);
 void prepare_pi(const std::string& release, const fs::path& storage);
 void prepare_profile(const std::string& url, const std::string& checksum, const fs::path& storage);
 void prepare_image(const fs::path& image, const fs::path& storage, const std::string& expected_sha256 = "", const std::string& expected_sha512 = "");

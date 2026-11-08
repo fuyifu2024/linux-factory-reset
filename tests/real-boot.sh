@@ -6,6 +6,9 @@ source=$1
 package=$2
 evidence=$3
 mode=${4:-local}
+distro=${5:-debian}
+fault=${6:-none}
+case "$fault" in none|failure|powercut) ;; *) exit 1 ;; esac
 case "$mode" in local|automatic) ;; *) exit 1 ;; esac
 work=$(mktemp -d /var/lib/linux-reset-vm.XXXXXX)
 target_loop='' recovery_loop='' vm_pid=''
@@ -28,7 +31,7 @@ recovery_uuid=$(blkid -s UUID -o value "$recovery_loop")
 mkdir "$work/recovery" "$work/target"
 mount "$recovery_loop" "$work/recovery"
 if [ "$mode" = local ]; then cp --sparse=always "$source" "$work/recovery/pristine.raw"; fi
-cp "$package" "$work/recovery/tool.deb"
+if [ "$distro" = fedora ]; then cp "$package" "$work/recovery/tool.rpm"; else cp "$package" "$work/recovery/tool.deb"; fi
 umount "$work/recovery"
 losetup --detach "$recovery_loop"; recovery_loop=''
 target_loop=$(losetup --find --show --partscan "$work/target.raw")
@@ -51,13 +54,14 @@ new_boot_partuuid=$(blkid -s PARTUUID -o value "$target_boot")
 mount -t ext4 "$target_root" "$work/target"
 mkdir -p "$work/target-boot"
 mount -t vfat "$target_boot" "$work/target-boot"
-for file in "$work/target/etc/fstab" "$work/target/boot/grub/grub.cfg" "$work/target-boot/EFI/debian/grub.cfg"; do
+for file in "$work/target/etc/fstab" "$work/target/boot/grub/grub.cfg" "$work/target/boot/grub2/grub.cfg" "$work/target-boot/EFI/BOOT/grub.cfg" "$work/target-boot/EFI/$distro/grub.cfg"; do
+    [ -f "$file" ] || continue
     sed -i "s/$old_fs_uuid/$new_fs_uuid/g; s/$old_root_partuuid/$new_root_partuuid/g; s/$old_boot_partuuid/$new_boot_partuuid/g" "$file"
 done
 umount "$work/target-boot"
 mkdir -p "$work/target/usr/local/sbin" "$work/target/etc/systemd/system/multi-user.target.wants"
 ln -sf /dev/null "$work/target/etc/systemd/system/systemd-firstboot.service"
-printf 'REC_UUID=%s\nREC_MODE=%s\n' "$recovery_uuid" "$mode" >"$work/target/etc/lfr-qa.conf"
+printf 'REC_UUID=%s\nREC_MODE=%s\nREC_DISTRO=%s\nREC_FAULT=%s\n' "$recovery_uuid" "$mode" "$distro" "$fault" >"$work/target/etc/lfr-qa.conf"
 cat >"$work/target/usr/local/sbin/lfr-qa" <<'GUEST'
 #!/bin/bash
 set -Eeuo pipefail
@@ -65,8 +69,29 @@ trap 'echo LFR_VM_PREPARATION_FAIL >/dev/ttyS0; systemctl --no-block poweroff' E
 source /etc/lfr-qa.conf
 mkdir -p /mnt/recovery
 mount -t ext4 "UUID=$REC_UUID" /mnt/recovery
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends /mnt/recovery/tool.deb
+if [[ $REC_FAULT != none ]] && grep -qx ROLLED_BACK /mnt/recovery/ubuntu-reset/rescue-*/result 2>/dev/null; then
+    getent passwd lfr_old_user
+    grep -qx 'old private data' /root/lfr-private
+    grep -qx 'old home' /home/lfr_old_user/private
+    grep -qx 'extra software' /opt/lfr-extra/unwanted
+    test ! -e /var/lib/ubuntu-reset/request
+    echo PASS >/var/lib/lfr-qa-result; sync; echo LFR_VM_ROLLBACK_PASS >/dev/ttyS0
+    systemctl --no-block poweroff; exit 0
+fi
+if [[ $REC_DISTRO == fedora ]]; then
+    dnf install -y /mnt/recovery/tool.rpm
+else
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends /mnt/recovery/tool.deb
+fi
+# Fault injection alters only the disposable guest's installed test copy.
+if [[ $REC_FAULT != none ]]; then
+    if [[ $REC_FAULT == failure ]]; then
+        sed -i '/uf_relocate .*Cannot relocate/a uf_fail "expected QA write failure"' /usr/lib/ubuntu-reset/restore.sh
+    else
+        sed -i '/echo .*removing users/data/a rm -rf "$UF_TARGET/boot" "$UF_TARGET/usr"; sync; echo LFR_VM_POWER_CUT_READY >/dev/console; sleep 600' /usr/lib/ubuntu-reset/restore.sh
+    fi
+fi
 useradd --create-home --shell /bin/bash lfr_old_user
 mkdir -p /opt/lfr-extra
 printf 'old private data\n' >/root/lfr-private
@@ -84,7 +109,7 @@ fi
 systemd-run --unit=lfr-qa-observer --property=StandardOutput=tty --property=TTYPath=/dev/ttyS0 /bin/bash -c '
     for ((i=0;i<180;i++)); do
         if test -f /var/lib/ubuntu-reset-firstboot-complete; then
-            if getent passwd lfrqatest && id -nG lfrqatest | grep -qw sudo && passwd -S root | grep -q " L "; then echo PASS >/var/lib/lfr-qa-result; sync; echo LFR_VM_RESTORE_PASS; else echo FAIL >/var/lib/lfr-qa-result; sync; echo LFR_VM_NEW_USER_FAIL; fi
+            if getent passwd lfrqatest && id -nG lfrqatest | grep -Eq "(^| )(sudo|wheel)( |$)" && passwd -S root | grep -q " L "; then echo PASS >/var/lib/lfr-qa-result; sync; echo LFR_VM_RESTORE_PASS; else echo FAIL >/var/lib/lfr-qa-result; sync; echo LFR_VM_NEW_USER_FAIL; fi
             systemctl --no-block poweroff; exit
         fi
         sleep 1
@@ -124,6 +149,7 @@ sync
 umount "$work/target"
 losetup --detach "$target_loop"; target_loop=''
 cp /usr/share/OVMF/OVMF_VARS_4M.fd "$work/vars.fd"
+start_vm() {
 qemu-system-x86_64 -machine q35,accel=kvm -cpu host -m 2048 -smp 2 -display none -vga std \
     -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
     -drive if=pflash,format=raw,file="$work/vars.fd" \
@@ -131,7 +157,21 @@ qemu-system-x86_64 -machine q35,accel=kvm -cpu host -m 2048 -smp 2 -display none
     -netdev user,id=n -device virtio-net-pci,netdev=n -serial file:"$evidence/vm-serial.txt" \
     -qmp unix:"$work/qmp.sock",server=on,wait=off -monitor none >"$evidence/qemu.txt" 2>&1 &
 vm_pid=$!
-node tests/drive-firstboot.mjs "$work/qmp.sock" "$evidence/vm-serial.txt"
+}
+start_vm
+set +e
+node tests/drive-firstboot.mjs "$work/qmp.sock" "$evidence/vm-serial.txt" "$fault"
+status=$?
+set -e
+if [ "$status" -eq 42 ] && [ "$fault" = powercut ]; then
+    kill -KILL "$vm_pid"; wait "$vm_pid" 2>/dev/null || :; vm_pid=''
+    cp "$evidence/vm-serial.txt" "$evidence/before-power-cut.txt"
+    : >"$evidence/vm-serial.txt"
+    start_vm
+    node tests/drive-firstboot.mjs "$work/qmp.sock" "$evidence/vm-serial.txt" rollback
+else
+    [ "$status" -eq 0 ]
+fi
 # The serial getty can reset its tty during shutdown; verify a synced result on disk too.
 kill "$vm_pid" 2>/dev/null || :
 wait "$vm_pid" 2>/dev/null || :
@@ -142,10 +182,20 @@ target_root=$(lsblk -nrpo PATH,FSTYPE "$target_loop" | awk '$2 == "ext4" {print 
 mount -t ext4 -o ro,noload "$target_root" "$work/target"
 cp "$work/target/var/lib/lfr-qa-result" "$evidence/guest-result.txt"
 grep -qx PASS "$evidence/guest-result.txt"
+if [ "$fault" = none ]; then
 grep -q '^lfrqatest:' "$work/target/etc/passwd"
 if grep -q '^lfr_old_user:' "$work/target/etc/passwd"; then exit 1; fi
 test ! -e "$work/target/home/lfr_old_user"
 test ! -e "$work/target/root/lfr-private"
 test ! -e "$work/target/opt/lfr-extra/unwanted"
 test ! -e "$work/target/var/lib/ubuntu-reset/request"
+else
+    grep -q '^lfr_old_user:' "$work/target/etc/passwd"
+    grep -qx 'old private data' "$work/target/root/lfr-private"
+    grep -qx 'extra software' "$work/target/opt/lfr-extra/unwanted"
+fi
+# No temporary personal backup may remain after either successful outcome.
+recovery_loop=$(losetup --find --show --read-only "$work/recovery.raw")
+mount -t ext4 -o ro,noload "$recovery_loop" "$work/recovery"
+for rescue in "$work/recovery/ubuntu-reset"/rescue-*; do test ! -e "$rescue/previous"; test ! -e "$rescue/active"; done
 echo 'Persistent restored-state verification passed.'

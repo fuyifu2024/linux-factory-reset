@@ -1,0 +1,59 @@
+name: Actual Ubuntu and Fedora restore and rollback
+on:
+  workflow_dispatch:
+    inputs:
+      distro:
+        type: choice
+        options: [ubuntu, fedora]
+        default: ubuntu
+      fault:
+        type: choice
+        options: [none, failure, powercut]
+        default: none
+permissions:
+  contents: read
+jobs:
+  restore:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disposable host dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libcurl4-openssl-dev nlohmann-json3-dev qemu-utils qemu-system-x86 ovmf gdisk parted nodejs rsync squashfs-tools btrfs-progs dosfstools
+      - name: Build host image converter
+        run: cmake -S . -B build -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr && cmake --build build -j2
+      - name: Build and test native guest package
+        env:
+          DISTRO: ${{ inputs.distro }}
+        run: |
+          if [ "$DISTRO" = fedora ]; then
+            docker run --rm -v "$PWD:/src" -w /src fedora:45 bash -ec '
+              dnf install -y gcc-c++ cmake openssl-devel libcurl-devel json-devel rpm-build file rsync squashfs-tools
+              cmake -S . -B build-native -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+              cmake --build build-native -j2
+              ctest --test-dir build-native --output-on-failure
+              cd build-native; cpack -G RPM
+            '
+          else
+            docker run --rm -v "$PWD:/src" -w /src ubuntu:26.04 bash -ec '
+              apt-get update
+              apt-get install -y --no-install-recommends build-essential cmake libssl-dev libcurl4-openssl-dev nlohmann-json3-dev file rsync squashfs-tools
+              cmake -S . -B build-native -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+              cmake --build build-native -j2
+              ctest --test-dir build-native --output-on-failure
+              cd build-native; cpack -G DEB
+            '
+          fi
+      - name: Real automatic official-source reset / failure / interrupted boot
+        env:
+          DISTRO: ${{ inputs.distro }}
+          FAULT: ${{ inputs.fault }}
+        run: sudo env GITHUB_ACTIONS=true bash tests/engine-image.sh "$DISTRO" "$FAULT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: engine-${{ inputs.distro }}-${{ inputs.fault }}
+          path: |
+            evidence/
+            build-native/*.deb
+            build-native/*.rpm
