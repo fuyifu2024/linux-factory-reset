@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import cp from 'node:child_process';
 const [guiPid, dir] = process.argv.slice(2);
 const pause = ms => new Promise(r => setTimeout(r, ms));
-const run = (cmd,args) => cp.execFileSync(cmd,args,{encoding:'utf8'}).trim();
+const run = (cmd,args) => cp.execFileSync(cmd,args,{encoding:'utf8',timeout:15000}).trim();
 const log = message => fs.appendFileSync(dir+'/steps.txt',message+'\n');
 let auths=0, shotAt=0;
 function dialog() {
@@ -49,7 +49,7 @@ async function chooseDirectory(path) {
 }
 async function confirm(value) {
   const d=await waitFor(d=>d.args.includes('--entry'),'confirmation');
-  cp.execFileSync('xclip',['-selection','clipboard'],{input:value,stdio:['pipe','ignore','ignore']});await keys(d,'ctrl+v','Return');
+  cp.execFileSync('xclip',['-selection','clipboard'],{input:value,stdio:['pipe','ignore','ignore'],timeout:15000});await keys(d,'ctrl+v','Return');
 }
 try {
   await main(2);await info('请先选择并准备恢复镜像');log('Unprepared preview guarded');

@@ -90,7 +90,7 @@ if [[ $REC_GUI == yes && $cycle -eq 1 ]]; then
         openbox >/mnt/recovery/gui-evidence/openbox.txt 2>&1 &
         /usr/bin/linux-factory-reset gui >/mnt/recovery/gui-evidence/gui.txt 2>&1 &
         gui_pid=$!
-        xterm -T "LFR authorization" -e script -q -f /mnt/recovery/gui-evidence/auth.txt -c "pkttyagent --process $gui_pid" &
+        xterm -fa monospace -fs 11 -T "LFR authorization" -e script -q -f /mnt/recovery/gui-evidence/auth.txt -c "pkttyagent --process $gui_pid" &
         node /mnt/recovery/drive-gui.mjs "$gui_pid" /mnt/recovery/gui-evidence /mnt/recovery/GUI-ARM-NOW
         wait "$gui_pid"' || [[ -e /mnt/recovery/gui-evidence/begin-restore ]]
     exit 0
