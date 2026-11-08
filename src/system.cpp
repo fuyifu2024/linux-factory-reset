@@ -326,20 +326,21 @@ static void import_disk_image(const fs::path& image, const fs::path& profile, co
     TempDir merged(work); auto tree = merged.path / "root", esp = merged.path / "esp"; fs::create_directory(tree); fs::create_directory(esp);
     run({"rsync", "-rt", boot.temp.path.string()+"/", esp.string()+"/"});
     std::string root_uuid; bool found_root = false, found_boot = false;
-    auto copy_tree = [&](const fs::path& source, const fs::path& dest) {
+    auto copy_tree = [&](const fs::path& source, const fs::path& dest, const fs::path& mounted_source) {
+        require_inside(mounted_source, source); require_inside(merged.path, dest);
         fs::create_directories(dest); run({"rsync", "-aHAXx", "--numeric-ids", "--exclude=/dev/***", "--exclude=/proc/***", "--exclude=/sys/***", "--exclude=/run/***", source.string()+"/", dest.string()+"/"});
     };
     if (!btrfs.empty()) {
         Mount source(btrfs[0], "btrfs", "ro,subvolid=5,nosuid,nodev,noexec");
         need(fs::is_regular_file(source.temp.path / "root/usr/lib/os-release"), "Fedora Btrfs import requires the standard root/boot/home/var subvolumes");
         need(distribution(read(source.temp.path / "root/usr/lib/os-release")).at("id") == "fedora", "Btrfs source is not Fedora");
-        copy_tree(source.temp.path / "root", tree);
-        for (const auto& sub : {"boot", "home", "var"}) { need(fs::is_directory(source.temp.path / sub), "Missing Fedora image subvolume"); copy_tree(source.temp.path / sub, tree / sub); }
+        copy_tree(source.temp.path / "root", tree, source.temp.path);
+        for (const auto& sub : {"boot", "home", "var"}) { need(fs::is_directory(source.temp.path / sub), "Missing Fedora image subvolume"); copy_tree(source.temp.path / sub, tree / sub, source.temp.path); }
         root_uuid = output({"blkid", "-s", "UUID", "-o", "value", btrfs[0]}); found_root = found_boot = true;
     } else for (const auto& dev : roots) {
         Mount source(dev, "ext4", "ro,noload,nosuid,nodev,noexec");
         if (fs::is_regular_file(source.temp.path / "usr/lib/os-release")) {
-            need(!found_root, "Multiple source roots"); copy_tree(source.temp.path, tree); found_root = true;
+            need(!found_root, "Multiple source roots"); copy_tree(source.temp.path, tree, source.temp.path); found_root = true;
             root_uuid = output({"blkid", "-s", "UUID", "-o", "value", dev});
         }
     }
@@ -350,7 +351,7 @@ static void import_disk_image(const fs::path& image, const fs::path& profile, co
         Mount source(dev, "ext4", "ro,noload,nosuid,nodev,noexec");
         if (fs::is_regular_file(source.temp.path / "usr/lib/os-release")) continue;
         need(!found_boot && fs::is_directory(source.temp.path / "grub"), "Extra source partition is not a standard Ubuntu /boot");
-        copy_tree(source.temp.path, tree / "boot"); found_boot = true;
+        copy_tree(source.temp.path, tree / "boot", source.temp.path); found_boot = true;
     }
     reference(tree, esp, platform, false);
     for (const auto& p : {"etc/default/grub", "etc/kernel/cmdline", "boot/grub/grub.cfg", "boot/grub2/grub.cfg", "dev", "proc", "sys"}) require_inside(tree, tree / p);
