@@ -60,7 +60,7 @@ set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION "/usr/lib" "/etc/initramfs-too
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_STRIP_FILES TRUE)
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS TRUE)
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "curl, gpgv, rsync, squashfs-tools, xz-utils, util-linux, initramfs-tools, zenity, pkexec, udev, findutils, qemu-utils, btrfs-progs, efibootmgr, grub-efi-amd64-bin | grub-efi-arm64-bin")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "curl, gpgv, rsync, squashfs-tools, xz-utils, util-linux, initramfs-tools, dash, zenity, pkexec, udev, findutils, qemu-utils, btrfs-progs, efibootmgr, grub-efi-amd64-bin | grub-efi-arm64-bin")
 # Resolve libssl3/libssl3t64 and other libraries from the actual distro build.
 execute_process(COMMAND dpkg-vendor --query Vendor OUTPUT_VARIABLE RESET_VENDOR OUTPUT_STRIP_TRAILING_WHITESPACE)
 if(RESET_VENDOR STREQUAL "Ubuntu")

@@ -1,4 +1,6 @@
 #!/bin/sh
 case "${1:-}" in prereqs) exit 0 ;; esac
 [ -f /conf/ubuntu-reset.conf ] || exit 0
-exec /usr/lib/ubuntu-reset/restore.sh "${rootmnt:-/root}"
+# BusyBox ash may execute NOEXEC applets internally even when PATH prefers our
+# real tools. Use the bundled POSIX shell for the shared recovery engine.
+exec /usr/lib/ubuntu-reset/bin/dash /usr/lib/ubuntu-reset/restore.sh "${rootmnt:-/root}"

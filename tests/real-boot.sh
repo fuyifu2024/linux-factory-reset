@@ -106,9 +106,9 @@ exec > >(tee /dev/ttyS0) 2>&1
 if getent passwd lfr_old_user || test -e /home/lfr_old_user || test -e /root/lfr-private || test -e /opt/lfr-extra/unwanted; then
     echo LFR_VM_OLD_DATA_SURVIVED; systemctl --no-block poweroff; exit 1
 fi
-observer_context=()
-if [[ -e /etc/fedora-release ]]; then observer_context=(--property=SELinuxContext=system_u:system_r:initrc_t:s0); fi
-systemd-run "${observer_context[@]}" --unit=lfr-qa-observer --property=StandardOutput=tty --property=TTYPath=/dev/ttyS0 /bin/bash -c '
+cat >/run/lfr-qa-observer.sh <<'MONITOR'
+#!/bin/bash
+set -o pipefail
     exec > >(tee /var/lib/lfr-qa-diagnostics /dev/ttyS0) 2>&1
     for ((i=0;i<180;i++)); do
         if test -f /var/lib/ubuntu-reset-firstboot-complete; then
@@ -127,7 +127,11 @@ systemd-run "${observer_context[@]}" --unit=lfr-qa-observer --property=StandardO
         sleep 1
     done
     journalctl -b -u ubuntu-reset-firstboot.service --no-pager
-    echo LFR_VM_SETUP_TIMEOUT; systemctl --no-block poweroff; exit 1'
+    echo LFR_VM_SETUP_TIMEOUT; systemctl --no-block poweroff; exit 1
+MONITOR
+observer_context=()
+if [[ -e /etc/fedora-release ]]; then observer_context=(--property=SELinuxContext=system_u:system_r:initrc_t:s0); fi
+systemd-run "${observer_context[@]}" --unit=lfr-qa-observer --property=StandardOutput=tty --property=TTYPath=/dev/ttyS0 --expand-environment=no /bin/bash /run/lfr-qa-observer.sh
 echo LFR_VM_AWAITING_NEW_USER
 OBSERVER
 sed '1d' /usr/lib/ubuntu-reset/firstboot.sh
