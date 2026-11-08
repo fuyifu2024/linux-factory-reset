@@ -14,6 +14,14 @@ work=$(mktemp -d /var/lib/linux-reset-vm.XXXXXX)
 target_loop='' recovery_loop='' vm_pid=''
 cleanup() {
     if [ -n "$vm_pid" ]; then kill "$vm_pid" 2>/dev/null || :; wait "$vm_pid" 2>/dev/null || :; fi
+    # Preserve real GUI/agent diagnostics even if the host driver refuses a failed VM.
+    if [ -f "$work/recovery.raw" ]; then
+        if ! mountpoint -q "$work/recovery"; then
+            if [ -z "$recovery_loop" ]; then recovery_loop=$(losetup --find --show --read-only "$work/recovery.raw") || :; fi
+            mount -t ext4 -o ro,noload "$recovery_loop" "$work/recovery" 2>/dev/null || :
+        fi
+        if [ -d "$work/recovery/gui-evidence" ]; then cp -a "$work/recovery/gui-evidence" "$evidence/" || :; fi
+    fi
     umount "$work/target-boot" 2>/dev/null || :
     umount "$work/target" 2>/dev/null || :
     umount "$work/recovery" 2>/dev/null || :

@@ -59,7 +59,7 @@ sed '1d' /usr/lib/ubuntu-reset/firstboot.sh
 install -m 755 /tmp/lfr-observed-firstboot /usr/lib/ubuntu-reset/firstboot.sh
 if [[ $REC_GUI == yes && $cycle -eq 1 ]]; then
     apt-get update
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xvfb openbox xterm xdotool xclip scrot nodejs dbus-x11
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xvfb openbox xterm xdotool xclip scrot nodejs dbus-x11 fonts-noto-cjk
     Xvfb :99 -screen 0 1024x768x24 -ac >/mnt/recovery/xvfb.txt 2>&1 &
     sleep 2
     mkdir -p /mnt/recovery/gui-evidence

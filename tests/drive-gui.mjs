@@ -43,7 +43,7 @@ async function info(expected) {
 async function chooseDirectory(path) {const d=await waitFor(d=>d.args.includes('--directory'),'directory');await keys(d,'ctrl+l');run('xdotool',['type','--clearmodifiers',path]);await keys(d,'Return');}
 async function confirm(value) {
   const d=await waitFor(d=>d.args.includes('--entry'),'confirmation');
-  cp.execFileSync('xclip',['-selection','clipboard'],{input:value});await keys(d,'ctrl+v','Return');
+  cp.execFileSync('xclip',['-selection','clipboard'],{input:value,stdio:['pipe','ignore','ignore']});await keys(d,'ctrl+v','Return');
 }
 try {
   await main(2);await info('请先选择并准备恢复镜像');log('Unprepared preview guarded');
