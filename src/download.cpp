@@ -82,9 +82,9 @@ std::string human(double count) {
 void validate(const OfficialImage& i) {
     need(i.distro == "ubuntu" || i.distro == "debian" || i.distro == "fedora", "Unsupported official distribution");
     need(i.arch == "amd64" || i.arch == "arm64", "Unsupported image architecture");
-    need(std::regex_match(i.filename, std::regex("[A-Za-z0-9][A-Za-z0-9.+_-]*\\.(iso|qcow2|img\\.xz)")), "Unsafe official image filename");
+    need(std::regex_match(i.filename, std::regex("[A-Za-z0-9][A-Za-z0-9.+_-]*\\.(iso|qcow2|img|img\\.xz)")), "Unsafe official image filename");
     need((i.checksum_algorithm == "sha256" && valid_sha(i.checksum)) || (i.checksum_algorithm == "sha512" && std::regex_match(i.checksum, std::regex("[0-9a-f]{128}"))), "官网未提供有效校验值，已停止下载"); https(i.url);
-    const auto allowed = i.distro == "ubuntu" ? (i.url.starts_with("https://releases.ubuntu.com/") || i.url.starts_with("https://cdimage.ubuntu.com/")) :
+    const auto allowed = i.distro == "ubuntu" ? (i.url.starts_with("https://releases.ubuntu.com/") || i.url.starts_with("https://cdimage.ubuntu.com/") || i.url.starts_with("https://cloud-images.ubuntu.com/releases/")) :
         i.distro == "debian" ? (i.url.starts_with("https://cdimage.debian.org/") || i.url.starts_with("https://cloud.debian.org/images/cloud/")) : i.url.starts_with("https://download.fedoraproject.org/");
     need(allowed, "Image is outside the selected distribution's official source");
     need(i.size <= image_limit, "Official image exceeds 16 GiB limit");
@@ -179,6 +179,19 @@ fs::path download_official(const OfficialImage& image, const fs::path& directory
     } catch (...) { if (fd >= 0) close(fd); std::error_code ec; fs::remove(partial, ec); throw; }
 }
 
+OfficialImage parse_fedora_recovery(const std::string& text, const std::string& arch, const std::string& version) {
+    need((arch == "amd64" || arch == "arm64") && std::regex_match(version, std::regex("[0-9]{1,3}")), "Invalid Fedora recovery selection");
+    auto entries = json::parse(text); need(entries.is_array(), "Invalid Fedora metadata"); OfficialImage selected;
+    for (const auto& row : entries) {
+        if (row.value("version", "") != version || row.value("arch", "") != (arch == "amd64" ? "x86_64" : "aarch64") || row.value("variant", "") != "Cloud") continue;
+        auto url = row.value("link", "");
+        if (!std::regex_match(url, std::regex("https://download\\.fedoraproject\\.org/pub/fedora/linux/releases/" + version + "/Cloud/[^/]+/images/Fedora-Cloud-Base-Generic-[A-Za-z0-9.+_-]+\\.qcow2"))) continue;
+        need(selected.filename.empty(), "Ambiguous Fedora recovery source");
+        selected = {"fedora", version, "Cloud Base (no desktop)", arch, url.substr(url.find_last_of('/')+1), url, row.value("sha256", ""), 0};
+        selected.format = "qcow2"; selected.automatic_restore = true; validate(selected);
+    }
+    need(!selected.filename.empty(), "No official Fedora Generic image for this exact release and architecture"); return selected;
+}
 OfficialImage resolve_recovery(const std::string& distro, const std::string& version, const std::string& platform, const std::string& proxy) {
     auto capability = source_capabilities(distro, version, platform); need(capability.at("automatic_available").get<bool>(), capability.at("reason"));
     if (distro == "debian") {
@@ -191,6 +204,15 @@ OfficialImage resolve_recovery(const std::string& distro, const std::string& ver
         }
         OfficialImage image{"debian", "13", "nocloud base system (no desktop)", arch, filename, base + filename, checksum, 0};
         image.format = "qcow2"; image.checksum_algorithm = "sha512"; image.automatic_restore = true; validate(image); return image;
+    }
+    if (distro == "fedora") return parse_fedora_recovery(fetch_metadata("https://fedoraproject.org/releases.json", proxy), platform == "arm64-uefi" ? "arm64" : "amd64", version);
+    if (platform != "raspi-arm64") {
+        std::string arch = platform == "arm64-uefi" ? "arm64" : "amd64";
+        std::string base = "https://cloud-images.ubuntu.com/releases/" + version + "/release/";
+        auto filename = "ubuntu-" + version + "-server-cloudimg-" + arch + ".img";
+        auto sums = fetch_metadata(base + "SHA256SUMS", proxy);
+        OfficialImage image{"ubuntu", version, "server base (no desktop)", arch, filename, base + filename, signed_checksum(sums, filename), 0};
+        image.format = "qcow2"; image.automatic_restore = true; validate(image); return image;
     }
     std::string base = "https://cdimage.ubuntu.com/releases/26.04.1/release/", filename = "ubuntu-26.04.1-preinstalled-desktop-arm64+raspi.img.xz";
     auto sums = fetch_metadata(base + "SHA256SUMS", proxy);
@@ -207,7 +229,7 @@ json download_catalog() {
     return {{"host_arch", host_arch()}, {"architectures", {"amd64", "arm64"}}, {"sources", {
         {{"distro", "ubuntu"}, {"releases", {"24.04", "26.04"}}, {"editions", {"desktop", "server"}}, {"download", true}, {"iso_automatic_restore", false}},
         {{"distro", "debian"}, {"releases", {"stable"}}, {"editions", {"netinst"}}, {"download", true}, {"iso_automatic_restore", false}},
-        {{"distro", "fedora"}, {"releases", {"stable"}}, {"editions", {"workstation", "server"}}, {"download", true}, {"reset_engine", false}},
+        {{"distro", "fedora"}, {"releases", {"stable"}}, {"editions", {"workstation", "server"}}, {"download", true}, {"reset_engine", true}},
         {{"distro", "linuxmint"}, {"download", false}, {"reset_engine", false}, {"reason", "Not integrated; no ARM64 image is assumed"}}}}};
 }
 }

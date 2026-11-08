@@ -16,6 +16,6 @@ uf_reconcile() {
         --exclude='/run/***' --exclude='/boot/firmware/***' --exclude='/boot/efi/***' \
         --exclude='/var/lib/ubuntu-reset/***' \
         "$uf_src/" "$uf_dst/" || return 93
-    rsync -rt --checksum --delete-delay --delay-updates \
+    rsync -rt --checksum --delete-delay --delay-updates --exclude='/EFI/LinuxFactoryReset/***' \
         "$uf_boot_src/" "$uf_boot_dst/" || return 94
 }

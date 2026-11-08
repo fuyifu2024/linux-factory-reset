@@ -98,7 +98,7 @@ static void automatic_preparation(const json& sources, const std::string& storag
 
 static void official_download() {
     auto distro = dialog({"--list", "--width=720", "--height=350", "--column=ID", "--column=官网来源", "--hide-column=1", "--print-column=1",
-        "--text=自动从官网取得下载地址及 SHA-256，无需手填网址。\n这里下载的是安装 ISO；ISO 自动恢复尚未实现。Fedora 当前支持下载，恢复引擎尚未支持。",
+        "--text=自动从官网取得下载地址及 SHA-256，无需手填网址。\n这里下载的是安装 ISO；ISO 自动恢复尚未实现。自动恢复请在“准备恢复资料”中选择匹配的官方基础系统源。",
         "ubuntu", "Ubuntu LTS 桌面 / 服务器", "debian", "Debian 稳定版网络安装镜像", "fedora", "Fedora 稳定版 Workstation / Server"});
     if (distro.empty()) return;
     auto arch = dialog({"--list", "--column=ID", "--column=架构", "--hide-column=1", "--print-column=1",

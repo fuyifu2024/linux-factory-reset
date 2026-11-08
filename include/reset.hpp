@@ -14,7 +14,7 @@ using json = nlohmann::json;
 using Args = std::vector<std::string>;
 struct Error : std::runtime_error { using std::runtime_error::runtime_error; };
 struct Result { int code; std::string text; };
-inline constexpr auto VERSION = "0.4.0-alpha.1";
+inline constexpr auto VERSION = "0.5.0-alpha.1";
 inline const fs::path STATE = "/etc/ubuntu-reset/state.json";
 inline const fs::path REQUEST = "/var/lib/ubuntu-reset/request";
 void need(bool condition, const std::string& message);
@@ -82,5 +82,6 @@ fs::path preflight(const json& state);
 void plan(const json& state);
 void arm(const json& state, const std::string& confirmation, bool reboot);
 void cancel();
+void install_rescue(const json& state, const fs::path& profile, const fs::path& initrd, const std::string& kernel);
 int gui(bool preview);
 }

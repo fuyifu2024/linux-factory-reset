@@ -7,10 +7,12 @@ mkdir -p "$DESTDIR/conf" "$DESTDIR/usr/lib/ubuntu-reset"
 copy_file config /etc/ubuntu-reset/boot.conf /conf/ubuntu-reset.conf
 copy_file script /usr/lib/ubuntu-reset/reconcile.sh /usr/lib/ubuntu-reset/reconcile.sh
 copy_file script /usr/lib/ubuntu-reset/relocate.sh /usr/lib/ubuntu-reset/relocate.sh
+copy_file script /usr/lib/ubuntu-reset/restore.sh /usr/lib/ubuntu-reset/restore.sh
 # Do not rely on the distro-specific BusyBox applet whitelist.
 for tool in rsync sha256sum du df stat find cat readlink grep sed awk mkdir rm sync sleep; do
     copy_exec "/usr/bin/$tool" "/usr/bin/$tool"
 done
+copy_exec /usr/sbin/efibootmgr /usr/sbin/efibootmgr
 copy_exec /usr/sbin/blkid /usr/sbin/blkid
 copy_exec /usr/sbin/losetup /usr/sbin/losetup
 for module in ext4 squashfs loop vfat nls_utf8 nls_ascii nls_cp437 usb_storage uas xhci_pci; do

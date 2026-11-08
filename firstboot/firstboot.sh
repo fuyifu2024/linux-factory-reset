@@ -3,7 +3,7 @@
 set -euo pipefail
 [[ $EUID -eq 0 ]] || exit 1
 [[ ! -e /var/lib/ubuntu-reset-firstboot-complete ]] || exit 0
-echo 'Debian / Ubuntu initial setup / 首次开机设置'
+echo 'Linux initial setup / 首次开机设置'
 echo 'Create a new local administrator. / 请创建新的本地管理员。'
 if [[ -f /var/lib/ubuntu-reset-firstboot-user ]]; then
     read -r factory_user </var/lib/ubuntu-reset-firstboot-user
@@ -23,7 +23,9 @@ if ! getent passwd "$factory_user" >/dev/null; then
     useradd --create-home --shell /bin/bash "$factory_user"
 fi
 while ! passwd "$factory_user"; do echo 'Password setup failed; try again.'; done
-usermod --append --groups sudo "$factory_user"
+factory_group=sudo
+if [[ -e /etc/fedora-release ]]; then factory_group=wheel; fi
+usermod --append --groups "$factory_group" "$factory_user"
 passwd --lock root >/dev/null
 touch /var/lib/ubuntu-reset-firstboot-complete
 # Disable the one-time setup; Before=getty@tty1 orders login after this script exits.

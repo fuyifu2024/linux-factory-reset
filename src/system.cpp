@@ -33,7 +33,7 @@ json hardware() {
     auto kind = select_platform(machine(), fs::exists("/sys/firmware/efi"), model, os.at("id"));
     std::string boot = kind == "raspi-arm64" ? "/boot/firmware" : "/boot/efi";
     if (kind != "raspi-arm64") {
-        need(fs::is_regular_file(efi_directory(boot, os.at("id")) / "grub.cfg") && fs::is_regular_file("/boot/grub/grub.cfg"),
+        need(fs::is_regular_file(efi_directory(boot, os.at("id")) / "grub.cfg") && fs::is_regular_file(os.at("id") == "fedora" ? "/boot/grub2/grub.cfg" : "/boot/grub/grub.cfg"),
              "Target must use its distribution's standard GRUB + EFI vendor-directory layout");
     }
     auto root = filesystem("/"); auto fw = filesystem(boot);
@@ -94,8 +94,9 @@ static json reference(const fs::path& root, const fs::path& boot, const std::str
     need(fs::is_regular_file(root / "usr/lib/os-release"), "Reference is not an installed Debian/Ubuntu filesystem");
     auto os = distribution(read(root / "usr/lib/os-release"));
     need(kind != "raspi-arm64" || os.at("id") == "ubuntu", "Native Pi firmware adapter currently requires Ubuntu; Debian ARM64 uses UEFI+GRUB");
-    for (const auto& name : {"etc/passwd", "etc/shadow", "etc/fstab", "var/lib/dpkg/status"})
+    for (const auto& name : {"etc/passwd", "etc/shadow", "etc/fstab"})
         need(fs::is_regular_file(root / name) && !fs::is_symlink(root / name), "Missing installed-system reference file: " + std::string(name));
+    need(fs::is_regular_file(root / (os.at("id") == "fedora" ? "usr/lib/sysimage/rpm/rpmdb.sqlite" : "var/lib/dpkg/status")), "Missing installed package database");
     std::istringstream passwd(read(root / "etc/passwd")); std::string line; bool root_account = false;
     while (std::getline(passwd, line)) {
         std::istringstream fields(line); std::vector<std::string> f; std::string value;
@@ -128,21 +129,21 @@ static json reference(const fs::path& root, const fs::path& boot, const std::str
         auto efi = efi_directory(boot, os.at("id"));
         require_inside(boot, efi / "grub.cfg");
         auto suffix = kind == "arm64-uefi" ? "aa64" : "x64";
-        need(fs::is_regular_file(root / "boot/grub/grub.cfg") && fs::is_regular_file(efi / "grub.cfg"), "Requires standard installed GRUB + distribution EFI pointer");
+        need(fs::is_regular_file(root / (os.at("id") == "fedora" ? "boot/grub2/grub.cfg" : "boot/grub/grub.cfg")) && fs::is_regular_file(efi / "grub.cfg"), "Requires standard installed GRUB + distribution EFI pointer");
         need(fs::is_regular_file(efi / (std::string("grub") + suffix + ".efi")), "Missing architecture-specific GRUB EFI binary");
         bool kernel_set = false;
         if (fs::is_directory(root / "usr/lib/modules")) for (const auto& entry : fs::directory_iterator(root / "usr/lib/modules")) {
             require_inside(root, entry.path());
             auto version = entry.path().filename().string();
-            for (const auto& file : {root / "boot" / ("vmlinuz-" + version), root / "boot" / ("initrd.img-" + version)}) require_inside(root, file);
-            if (entry.is_directory() && fs::is_regular_file(root / "boot" / ("vmlinuz-" + version)) && fs::is_regular_file(root / "boot" / ("initrd.img-" + version))) kernel_set = true;
+            for (const auto& file : {root / "boot" / ("vmlinuz-" + version), root / "boot" / ((os.at("id") == "fedora" ? "initramfs-" : "initrd.img-") + version + (os.at("id") == "fedora" ? ".img" : ""))}) require_inside(root, file);
+            if (entry.is_directory() && fs::is_regular_file(root / "boot" / ("vmlinuz-" + version)) && fs::is_regular_file(root / "boot" / ((os.at("id") == "fedora" ? "initramfs-" : "initrd.img-") + version + (os.at("id") == "fedora" ? ".img" : "")))) kernel_set = true;
         }
         need(kernel_set, "UEFI reference needs a matching installed kernel, initrd and modules directory; bootability still requires a VM/hardware test");
         // An unsigned GRUB installation is valid when Secure Boot is disabled.
         // If shim is used, its presence/validity remains the trusted profile producer's responsibility.
         for (const auto& name : {"usr/bin/sudo", "usr/bin/passwd", "usr/sbin/useradd", "usr/sbin/usermod"})
             need(fs::is_regular_file(root / name), "UEFI first-user setup requires sudo/passwd account tools: " + std::string(name));
-        need(std::regex_search(read(root / "etc/group"), std::regex("(^|\n)sudo:[^:]*:[0-9]+:")), "Reference must contain the sudo administrator group");
+        need(std::regex_search(read(root / "etc/group"), std::regex(os.at("id") == "fedora" ? "(^|\n)wheel:[^:]*:[0-9]+:" : "(^|\n)sudo:[^:]*:[0-9]+:")), "Reference must contain its administrator group");
         if (prepared) need(fs::is_regular_file(root / "var/lib/ubuntu-reset-firstboot-ready") && fs::is_regular_file(root / "usr/lib/ubuntu-reset/firstboot.sh"), "UEFI profile is missing the initial-user setup flow");
     }
     if (prepared) {
@@ -154,7 +155,7 @@ static json reference(const fs::path& root, const fs::path& boot, const std::str
         if (kind != "raspi-arm64") {
             auto mask = root / "etc/systemd/system/systemd-firstboot.service";
             need(fs::is_symlink(mask) && fs::read_symlink(mask) == "/dev/null", "旧恢复资料可能卡在系统首次设置。请用新版重新准备镜像。");
-            validate_grub_roots(read(root / "boot/grub/grub.cfg"));
+            validate_grub_roots(read(root / (os.at("id") == "fedora" ? "boot/grub2/grub.cfg" : "boot/grub/grub.cfg")));
         }
         auto fstab = read(root / "etc/fstab");
         need(fstab.find("@ROOT_UUID@") != std::string::npos && fstab.find("@BOOT_UUID@") != std::string::npos, "Profile fstab lacks relocation placeholders");
@@ -162,7 +163,7 @@ static json reference(const fs::path& root, const fs::path& boot, const std::str
             for (const auto& e : fs::recursive_directory_iterator(boot)) if (e.path().filename() == "cmdline.txt" && e.is_regular_file()) {
                 require_inside(boot, e.path()); need(read(e.path()).find("root=UUID=@ROOT_UUID@") != std::string::npos, "Pi boot command lacks relocation placeholder");
             }
-        } else for (const auto& file : {root / "boot/grub/grub.cfg", efi_directory(boot, os.at("id")) / "grub.cfg"})
+        } else for (const auto& file : {root / (os.at("id") == "fedora" ? "boot/grub2/grub.cfg" : "boot/grub/grub.cfg"), efi_directory(boot, os.at("id")) / "grub.cfg"})
             need(read(file).find("@ROOT_UUID@") != std::string::npos, "GRUB profile lacks root relocation placeholder");
     }
     return {{"schema", 2}, {"platform", kind}, {"distro", os.at("id")}, {"version_id", os.at("version_id")}};
@@ -175,7 +176,8 @@ static void replace_all(std::string& text, const std::string& from, const std::s
     while ((i = text.find(from, i)) != std::string::npos) { text.replace(i, from.size(), to); i += to.size(); }
 }
 void make_profile(const fs::path& root, const fs::path& boot, const std::string& kind, const fs::path& dest, const json& provenance, const fs::path& firstboot_assets) {
-    auto meta = reference(root, boot, kind, false); need(!fs::exists(dest), "Destination already exists");
+    auto meta = reference(root, boot, kind, false);
+    auto grubpath = meta.at("distro") == "fedora" ? "boot/grub2/grub.cfg" : "boot/grub/grub.cfg"; need(!fs::exists(dest), "Destination already exists");
     auto size = std::stoull(output({"du", "-sx", "--block-size=1", str(root)}));
     need(fs::space(dest.parent_path()).available > size * 2 + (1ULL << 30), "Need space for staging plus compressed recovery data");
     TempDir stage(dest.parent_path()); auto r = stage.path / "root", b = stage.path / "boot"; fs::create_directory(r); fs::create_directory(b);
@@ -230,13 +232,15 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
         }
     } else {
         need(valid_uuid(old_uuid), "UEFI reference must use a root UUID in fstab");
-        for (const auto& p : {r / "boot/grub/grub.cfg", efi_directory(b, meta.at("distro")) / "grub.cfg"}) {
-            require_inside(p == r / "boot/grub/grub.cfg" ? r : b, p);
+        for (const auto& p : {r / grubpath, efi_directory(b, meta.at("distro")) / "grub.cfg"}) {
+            require_inside(p == r / grubpath ? r : b, p);
             need(!fs::is_symlink(p), "Unsafe GRUB config symlink"); auto text = read(p);
             need(text.find(old_uuid) != std::string::npos, "Standard GRUB configs must reference the root UUID; embedded/custom layouts are unsupported");
-            if (p == r / "boot/grub/grub.cfg") text = normalize_grub_roots(text, old_uuid, root_spec);
+            if (p == r / grubpath) text = normalize_grub_roots(text, old_uuid, root_spec);
             replace_all(text, old_uuid, "@ROOT_UUID@"); write(p, text);
         }
+        auto fallback = b / "EFI/BOOT/grub.cfg"; require_inside(b, fallback);
+        if (fs::is_regular_file(fallback)) { auto text = read(fallback); replace_all(text, old_uuid, "@ROOT_UUID@"); write(fallback, text); }
         // PID 1's generic firstboot wizard can otherwise block sysinit before our account wizard.
         // Mask only that service in this private profile; machine-id still regenerates normally.
         fs::create_directories(r / "etc/systemd/system");
@@ -253,6 +257,18 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
         auto link = r / "etc/systemd/system/multi-user.target.wants/ubuntu-reset-firstboot.service";
         fs::remove(link); fs::create_symlink("../ubuntu-reset-firstboot.service", link);
         write(r / "var/lib/ubuntu-reset-firstboot-ready", "console-setup-v1\n");
+    }
+    if (fs::is_directory(r / "etc/cloud")) {
+        require_inside(r, r / "etc/cloud/cloud-init.disabled"); write(r / "etc/cloud/cloud-init.disabled", "Disabled for local factory account setup\n");
+    }
+    if (meta.at("distro") == "ubuntu" && kind != "raspi-arm64" && fs::is_directory(r / "etc/netplan")) {
+        require_inside(r, r / "etc/netplan/90-factory.yaml");
+        write(r / "etc/netplan/90-factory.yaml", "network:\n  version: 2\n  ethernets:\n    factory:\n      match: {name: 'e*'}\n      dhcp4: true\n      optional: true\n");
+        fs::permissions(r / "etc/netplan/90-factory.yaml", fs::perms::owner_read | fs::perms::owner_write);
+    }
+    if (meta.at("distro") == "fedora") {
+        require_inside(r, r / "etc/kernel/cmdline"); write(r / "etc/kernel/cmdline", "root=UUID=@ROOT_UUID@ ro\n");
+        write(r / ".autorelabel", "-F\n");
     }
     // Empty runtime mountpoint directories are needed for the next boot.
     for (const auto& dir : {"dev", "proc", "sys", "run", "boot/firmware", "boot/efi"}) fs::create_directories(r / dir);
@@ -278,17 +294,83 @@ struct Loop {
 static void import_disk_image(const fs::path& image, const fs::path& profile, const Storage& st, const json& provenance) {
     Loop loop(image); run({"udevadm", "settle"});
     auto parts = json::parse(output({"lsblk", "--json", "--tree", "-o", "PATH,FSTYPE", loop.device}));
-    std::vector<std::string> roots, boots;
+    std::vector<std::string> roots, boots, btrfs;
     for (const auto& p : parts.at("blockdevices")[0].value("children", json::array())) {
         if (p["fstype"] == "ext4") roots.push_back(p["path"]);
+        if (p["fstype"] == "btrfs") btrfs.push_back(p["path"]);
         if (p["fstype"] == "vfat") boots.push_back(p["path"]);
     }
-    need(roots.size() == 1 && boots.size() == 1,
-         "镜像需要包含一个 ext4 系统分区和一个 FAT 启动分区。安装 ISO、加密盘或独立 /boot 布局目前不能导入；尚未修改当前系统。");
-    Mount root(roots[0], "ext4", "ro,noload,nosuid,nodev,noexec"), boot(boots[0], "vfat", "ro,nosuid,nodev,noexec");
-    auto os = distribution(read(root.temp.path / "usr/lib/os-release"));
-    need(os.at("id") == st.hw.at("distro"), "所选镜像与当前系统发行版不同。请选择同一发行版、CPU 架构和引导布局的初始系统镜像。");
-    make_profile(root.temp.path, boot.temp.path, st.hw.at("platform"), profile, provenance);
+    need(boots.size() == 1 && ((roots.size() >= 1 && roots.size() <= 2 && btrfs.empty()) || (roots.empty() && btrfs.size() == 1)), "Source needs an installed ext4 or Fedora Btrfs system plus one FAT ESP");
+    Mount boot(boots[0], "vfat", "ro,nosuid,nodev,noexec");
+    TempDir merged(st.work); auto tree = merged.path / "root", esp = merged.path / "esp"; fs::create_directory(tree); fs::create_directory(esp);
+    run({"rsync", "-rt", boot.temp.path.string()+"/", esp.string()+"/"});
+    std::string root_uuid; bool found_root = false, found_boot = false;
+    auto copy_tree = [&](const fs::path& source, const fs::path& dest) {
+        fs::create_directories(dest); run({"rsync", "-aHAXx", "--numeric-ids", "--exclude=/dev/***", "--exclude=/proc/***", "--exclude=/sys/***", "--exclude=/run/***", source.string()+"/", dest.string()+"/"});
+    };
+    if (!btrfs.empty()) {
+        Mount source(btrfs[0], "btrfs", "ro,subvolid=5,nosuid,nodev,noexec");
+        need(fs::is_regular_file(source.temp.path / "root/usr/lib/os-release"), "Fedora Btrfs import requires the standard root/boot/home/var subvolumes");
+        need(distribution(read(source.temp.path / "root/usr/lib/os-release")).at("id") == "fedora", "Btrfs source is not Fedora");
+        copy_tree(source.temp.path / "root", tree);
+        for (const auto& sub : {"boot", "home", "var"}) { need(fs::is_directory(source.temp.path / sub), "Missing Fedora image subvolume"); copy_tree(source.temp.path / sub, tree / sub); }
+        root_uuid = output({"blkid", "-s", "UUID", "-o", "value", btrfs[0]}); found_root = found_boot = true;
+    } else for (const auto& dev : roots) {
+        Mount source(dev, "ext4", "ro,noload,nosuid,nodev,noexec");
+        if (fs::is_regular_file(source.temp.path / "usr/lib/os-release")) {
+            need(!found_root, "Multiple source roots"); copy_tree(source.temp.path, tree); found_root = true;
+            root_uuid = output({"blkid", "-s", "UUID", "-o", "value", dev});
+        }
+    }
+    need(found_root && valid_uuid(root_uuid), "No unambiguous installed root in source image");
+    auto os = distribution(read(tree / "usr/lib/os-release"));
+    need(os.at("id") == st.hw.at("distro"), "所选镜像与当前系统发行版不同。");
+    if (roots.size() == 2) for (const auto& dev : roots) {
+        Mount source(dev, "ext4", "ro,noload,nosuid,nodev,noexec");
+        if (fs::is_regular_file(source.temp.path / "usr/lib/os-release")) continue;
+        need(!found_boot && fs::is_directory(source.temp.path / "grub"), "Extra source partition is not a standard Ubuntu /boot");
+        copy_tree(source.temp.path, tree / "boot"); found_boot = true;
+    }
+    reference(tree, esp, st.hw.at("platform"), false);
+    for (const auto& p : {"etc/default/grub", "etc/kernel/cmdline", "boot/grub/grub.cfg", "boot/grub2/grub.cfg", "dev", "proc", "sys"}) require_inside(tree, tree / p);
+    // Normalize source-only split boot/subvolumes into the explicitly supported flat ext4 target.
+    // Nothing is written to the currently installed root during this operation.
+    auto distro = os.at("id").get<std::string>(); auto grubdir = distro == "fedora" ? "grub2" : "grub";
+    write(tree / "etc/fstab", "UUID="+root_uuid+" / ext4 defaults 0 1\nUUID="+output({"blkid", "-s", "UUID", "-o", "value", boots[0]})+" /boot/efi vfat defaults 0 2\n");
+    std::string menu = "set timeout=3\nsearch --no-floppy --fs-uuid --set=root "+root_uuid+"\n"; bool have_kernel = false;
+    for (const auto& e : fs::directory_iterator(tree / "usr/lib/modules")) {
+        auto version = e.path().filename().string(); need(std::regex_match(version, std::regex("[A-Za-z0-9._+-]+")), "Invalid source kernel version");
+        if (!fs::is_regular_file(tree / "boot" / ("vmlinuz-"+version))) continue;
+        auto initrd = (distro == "fedora" ? "initramfs-" : "initrd.img-") + version + (distro == "fedora" ? ".img" : "");
+        need(fs::is_regular_file(tree / "boot" / initrd), "Missing source initramfs");
+        menu += "menuentry 'Factory initial system' {\nlinux /boot/vmlinuz-"+version+" root=UUID="+root_uuid+" ro console=tty0 console=ttyS0,115200\ninitrd /boot/"+initrd+"\n}\n"; have_kernel = true;
+    }
+    need(have_kernel, "Source has no installed kernel"); fs::create_directories(tree / "boot" / grubdir);
+    write(tree / "boot" / grubdir / "grub.cfg", menu);
+    auto pointer = "search --fs-uuid --set=root "+root_uuid+"\nset prefix=($root)/boot/"+grubdir+"\nconfigfile $prefix/grub.cfg\n";
+    write(efi_directory(esp, distro) / "grub.cfg", pointer);
+    if (fs::is_regular_file(esp / "EFI/BOOT/grub.cfg")) write(esp / "EFI/BOOT/grub.cfg", pointer);
+    if (distro == "fedora") {
+        need(host_arch() == (st.hw.at("platform") == "x86_64-uefi" ? "amd64" : "arm64"), "Fedora initramfs conversion requires native source architecture");
+        // Official generic dracut images contain Btrfs subvolume cmdlines. Rebuild from
+        // the pristine staged userspace, never from this machine's personal configuration.
+        fs::create_directories(tree / "dev"); fs::create_directories(tree / "proc");
+        for (const auto& node : {"null", "zero", "random", "urandom"}) {
+            auto minor = std::string(node) == "null" ? "3" : std::string(node) == "zero" ? "5" : std::string(node) == "random" ? "8" : "9";
+            if (!fs::exists(tree / "dev" / node)) run({"mknod", "-m", "666", (tree / "dev" / node).string(), "c", "1", minor});
+        }
+        fs::create_symlink("/proc/self/fd", tree / "dev/fd");
+        run({"mount", "-t", "proc", "-o", "nosuid,nodev,noexec", "proc", (tree / "proc").string()});
+        try { for (const auto& e : fs::directory_iterator(tree / "usr/lib/modules")) {
+            auto version = e.path().filename().string();
+            if (fs::is_regular_file(tree / "boot" / ("vmlinuz-"+version))) run({"chroot", tree.string(), "/usr/bin/dracut", "--force", "--no-hostonly", "--no-hostonly-cmdline", "/boot/initramfs-"+version+".img", version});
+        }
+        } catch (...) { command({"umount", (tree / "proc").string()}, false); throw; }
+        run({"umount", (tree / "proc").string()});
+        write(tree / "etc/default/grub", "GRUB_ENABLE_BLSCFG=false\nGRUB_TIMEOUT=3\nGRUB_CMDLINE_LINUX=\"\"\n");
+        write(tree / "etc/kernel/cmdline", "root=UUID="+root_uuid+" ro\n");
+    }
+    make_profile(tree, esp, st.hw.at("platform"), profile, provenance);
 }
 static void check_profile(const fs::path& profile, const Storage& st) {
     Mount source(profile, "squashfs", "ro,loop,nosuid,nodev,noexec"); auto meta = json::parse(read(source.temp.path / "profile.json"));
@@ -334,6 +416,10 @@ void prepare_image(const fs::path& selected, const fs::path& location, const std
     if (!expected_sha256.empty()) provenance["expected_sha256"] = expected_sha256;
     if (!expected_sha512.empty()) provenance["expected_sha512"] = expected_sha512;
     if (!expected_sha256.empty() || !expected_sha512.empty()) provenance["snapshot_checksum_verified"] = true;
+    if (format == "raw") {
+        int fd = open(snapshot.c_str(), O_RDONLY | O_CLOEXEC); char magic[4]{}; auto count = ::read(fd, magic, 4); close(fd);
+        if (count == 4 && std::string(magic,4) == std::string("QFI\xfb",4)) format = "qcow2";
+    }
     if (format == "profile") {
         check_profile(snapshot, st); register_profile(snapshot, st, provenance); return;
     }
@@ -436,12 +522,18 @@ void plan(const json& s) {
     std::cout << "Preview only. UUID placeholders are replaced offline. Pending state is removed after successful restore.\n";
 }
 void arm(const json& s, const std::string& confirmation, bool reboot) {
-    root_only(); need(confirmation == "ERASE-ALL-USERS", "Requires --confirm ERASE-ALL-USERS"); no_pending(); preflight(s);
+    root_only(); need(confirmation == "ERASE-ALL-USERS", "Requires --confirm ERASE-ALL-USERS"); no_pending(); auto profile = preflight(s);
+    if (state_distro(s) != "fedora") {
     need(fs::is_regular_file("/etc/initramfs-tools/hooks/ubuntu-reset") && fs::is_regular_file("/etc/initramfs-tools/scripts/local-bottom/ubuntu-reset"), "Install the recovery hooks first");
     secure("/etc/initramfs-tools/hooks/ubuntu-reset"); secure("/etc/initramfs-tools/scripts/local-bottom/ubuntu-reset");
-    atomic_write("/etc/ubuntu-reset/boot.conf", boot_config(s)); auto k = kernel(); run({"update-initramfs", "-u", "-k", k});
-    auto initrd = fs::path("/boot") / ("initrd.img-" + k); auto contents = output({"lsinitramfs", str(initrd)});
-    need(contents.find("scripts/local-bottom/ubuntu-reset") != std::string::npos && contents.find("conf/ubuntu-reset.conf") != std::string::npos
+    }
+    atomic_write("/etc/ubuntu-reset/boot.conf", boot_config(s)); auto k = kernel();
+    bool fedora = state_distro(s) == "fedora";
+    if (fedora) run({"dracut", "--force", "--add", "linux-factory-reset", "--kver", k});
+    else run({"update-initramfs", "-u", "-k", k});
+    auto initrd = fs::path("/boot") / ((fedora ? "initramfs-" : "initrd.img-") + k + (fedora ? ".img" : ""));
+    auto contents = output({fedora ? "lsinitrd" : "lsinitramfs", str(initrd)});
+    need(contents.find(fedora ? "pre-pivot" : "scripts/local-bottom/ubuntu-reset") != std::string::npos && contents.find("conf/ubuntu-reset.conf") != std::string::npos
          && contents.find("usr/lib/ubuntu-reset/relocate.sh") != std::string::npos, "Recovery files are absent from initramfs");
     for (const auto& tool : {"awk", "grep", "sed", "rsync", "sha256sum", "readlink", "sync"})
         need(contents.find(std::string("usr/bin/") + tool) != std::string::npos, "Recovery utility missing from initramfs: " + std::string(tool));
@@ -450,13 +542,32 @@ void arm(const json& s, const std::string& confirmation, bool reboot) {
         auto config = read("/boot/firmware/config.txt");
         need(stock_pi_boot(config), "Unsupported/ambiguous Pi boot recipe");
         need(sha256("/boot/firmware/current/initrd.img") == sha256(initrd), "flash-kernel did not update the active Pi initrd");
-    } else need(read("/boot/grub/grub.cfg").find("initrd.img-" + k) != std::string::npos, "Current kernel initrd is not listed in GRUB");
+    } else {
+        if (!fedora) need(read("/boot/grub/grub.cfg").find("initrd.img-" + k) != std::string::npos, "Current kernel initrd is not listed in GRUB");
+        install_rescue(s, profile, initrd, k);
+    }
     atomic_write(REQUEST, s.at("id").get<std::string>() + "\n");
-    std::cout << "Reset armed for next normal boot. Cancel before reboot: sudo ubuntu-reset cancel\n" << std::flush;
+    std::cout << "Reset armed with independent UEFI rescue and temporary rollback backup. Cancel before reboot: sudo ubuntu-reset cancel\n" << std::flush;
     if (reboot) run({"systemctl", "reboot"});
 }
 void cancel() {
-    root_only(); if (fs::exists(REQUEST) || fs::is_symlink(REQUEST)) { secure(REQUEST); fs::remove(REQUEST); sync(); }
+    root_only();
+    if (fs::exists(STATE)) {
+        auto state = load_state();
+        if (state.at("platform") != "raspi-arm64") {
+            auto profile = preflight(state); auto rescue = profile.parent_path() / ("rescue-" + state.at("id").get<std::string>());
+            if (fs::exists(rescue)) {
+                secure(rescue);
+                need(!fs::exists(rescue / "phase"), "Restore has already started; use the independent rescue rollback entry");
+                auto order = read(rescue / "original-order"); while (!order.empty() && order.back() == '\n') order.pop_back();
+                need(std::regex_match(order, std::regex("[0-9A-Fa-f,]+")), "Invalid original BootOrder");
+                run({"efibootmgr", "--bootorder", order});
+                if (fs::exists(rescue / "entry")) { auto entry = read(rescue / "entry"); while (!entry.empty() && entry.back() == '\n') entry.pop_back(); need(std::regex_match(entry, std::regex("[0-9A-Fa-f]{4}")), "Invalid rescue entry"); run({"efibootmgr", "--bootnum", entry, "--delete-bootnum"}); }
+                fs::remove_all("/boot/efi/EFI/LinuxFactoryReset"); fs::remove_all(rescue);
+            }
+        }
+    }
+    if (fs::exists(REQUEST) || fs::is_symlink(REQUEST)) { secure(REQUEST); fs::remove(REQUEST); sync(); }
     std::cout << "Pending reset cancelled. System files were not restored.\n";
 }
 json firmware_status() {

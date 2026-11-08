@@ -148,11 +148,11 @@ json distribution(const std::string& text) {
         if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') || (value.front() == '\'' && value.back() == '\''))) value = value.substr(1, value.size() - 2);
         need(!values.contains(key), "Duplicate os-release key: " + key); values[key] = value;
     }
-    need(values["ID"] == "ubuntu" || values["ID"] == "debian", "Only Debian and Ubuntu are supported (ID, not ID_LIKE)");
+    need(values["ID"] == "ubuntu" || values["ID"] == "debian" || values["ID"] == "fedora", "Supported target IDs: Debian, Ubuntu, Fedora");
     return {{"id", values["ID"]}, {"version_id", values["VERSION_ID"]}};
 }
 std::string select_platform(const std::string& arch, bool uefi, const std::string& model, const std::string& distro) {
-    need(distro == "ubuntu" || distro == "debian", "Unsupported target distribution");
+    need(distro == "ubuntu" || distro == "debian" || distro == "fedora", "Unsupported target distribution");
     if ((arch == "aarch64" || arch == "arm64") && uefi) return "arm64-uefi";
     if (arch == "x86_64" && uefi) return "x86_64-uefi";
     if (arch == "aarch64" && distro == "ubuntu" && model.find("Raspberry Pi 5") != std::string::npos) return "raspi-arm64";
@@ -161,10 +161,10 @@ std::string select_platform(const std::string& arch, bool uefi, const std::strin
 std::string state_distro(const json& s) {
     if (s.at("schema") == 1) return "ubuntu"; // alpha.1 profile/state compatibility.
     auto id = s.at("distro").get<std::string>();
-    need(id == "ubuntu" || id == "debian", "Invalid profile distribution"); return id;
+    need(id == "ubuntu" || id == "debian" || id == "fedora", "Invalid profile distribution"); return id;
 }
 fs::path efi_directory(const fs::path& boot, const std::string& distro) {
-    need(distro == "ubuntu" || distro == "debian", "Invalid EFI distributor");
+    need(distro == "ubuntu" || distro == "debian" || distro == "fedora", "Invalid EFI distributor");
     return boot / "EFI" / distro;
 }
 void validate_state(const json& s) {
@@ -204,10 +204,11 @@ std::string image_format(const fs::path& file) {
     throw Error("请选择 IMG、RAW、IMG.XZ、RAW.XZ、QCOW2 或本项目的恢复资料文件；不要选择虚拟磁盘设备。");
 }
 json source_capabilities(const std::string& distro, const std::string& version, const std::string& platform) {
-    bool automatic = (distro == "ubuntu" && version == "26.04" && platform == "raspi-arm64") || (distro == "debian" && version == "13" && (platform == "x86_64-uefi" || platform == "arm64-uefi"));
+    bool uefi = platform == "x86_64-uefi" || platform == "arm64-uefi";
+    bool automatic = (distro == "ubuntu" && ((version == "26.04" && platform == "raspi-arm64") || (uefi && (version == "24.04" || version == "26.04")))) || (distro == "debian" && version == "13" && uefi) || (distro == "fedora" && (version == "44" || version == "45") && uefi);
     return {{"automatic_available", automatic}, {"distro", distro}, {"version", version}, {"platform", platform},
-            {"automatic_release", automatic ? (distro == "debian" ? "13" : "26.04.1") : ""},
-            {"reason", automatic ? (distro == "debian" ? "自动获取 Debian 13 官方基础系统镜像（无桌面），以官网 HTTPS SHA-512 校验。恢复后在控制台创建新用户；不是原桌面软件包的历史副本。" : "可自动选择 Ubuntu 官方来源并验签，无需填写网址") : "当前设备还没有内置并验证的官方自动恢复源。请选择本地 IMG/RAW 等镜像；无需自建网址。"},
+            {"automatic_release", automatic ? version : ""},
+            {"reason", automatic ? (platform != "raspi-arm64" ? "自动获取官方基础/服务器镜像（无桌面），版本与当前系统一致，以官网 HTTPS 校验值验证。恢复后创建新管理员；云端账号初始化将被禁用。不是原桌面的历史副本。" : "可自动选择 Ubuntu 官方来源并验签，无需填写网址") : "当前设备还没有内置并验证的官方自动恢复源。请选择本地 IMG/RAW 等镜像；无需自建网址。"},
             {"iso_automatic_install", false}, {"local_formats", {"img", "raw", "img.xz", "raw.xz", "qcow2", "squashfs"}}};
 }
 fs::path recovery_mount(const fs::path& selected, const json& filesystem, const json& target) {

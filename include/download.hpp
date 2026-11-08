@@ -23,6 +23,7 @@ std::string fetch_metadata(const std::string& url, const std::string& proxy = ""
 OfficialImage parse_sums(const std::string& text, const std::string& distro, const std::string& release,
                          const std::string& edition, const std::string& arch, const std::string& base);
 OfficialImage parse_fedora(const std::string& text, const std::string& arch, const std::string& edition);
+OfficialImage parse_fedora_recovery(const std::string& text, const std::string& arch, const std::string& version);
 OfficialImage resolve_image(const std::string& distro, const std::string& release, const std::string& edition,
                             const std::string& arch, const std::string& proxy = "");
 fs::path download_official(const OfficialImage& image, const fs::path& directory,
