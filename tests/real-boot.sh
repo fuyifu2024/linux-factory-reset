@@ -9,7 +9,7 @@ mode=${4:-local}
 distro=${5:-debian}
 fault=${6:-none}
 case "$fault" in none|failure|powercut) ;; *) exit 1 ;; esac
-case "$mode" in local|automatic) ;; *) exit 1 ;; esac
+case "$mode" in local|automatic|profile) ;; *) exit 1 ;; esac
 work=$(mktemp -d /var/lib/linux-reset-vm.XXXXXX)
 target_loop='' recovery_loop='' vm_pid=''
 cleanup() {
@@ -40,6 +40,19 @@ recovery_uuid=$(blkid -s UUID -o value "$recovery_loop")
 mkdir "$work/recovery" "$work/target"
 mount "$recovery_loop" "$work/recovery"
 if [ "$mode" = local ]; then cp --sparse=always "$source" "$work/recovery/pristine.raw"; fi
+if [ "$mode" = profile ]; then
+    unsquashfs -no-progress -d "$work/observed-profile" "$ARM_PROFILE_SOURCE"
+    # Apply the same observer prefix used by vm-guest.sh to only this QA profile.
+    # Preserve the complete production first-user body after the prefix.
+    {
+        printf '#!/bin/bash\nREC_UUID=%s\n' "$recovery_uuid"
+        sed -n "/^cat <<'OBSERVER'$/,/^OBSERVER$/p" tests/vm-guest.sh | sed '1d;$d'
+        sed '1d' "$work/observed-profile/root/usr/lib/ubuntu-reset/firstboot.sh"
+    } >"$work/observed-firstboot"
+    install -m 755 "$work/observed-firstboot" "$work/observed-profile/root/usr/lib/ubuntu-reset/firstboot.sh"
+    mksquashfs "$work/observed-profile" "$work/recovery/pristine.squashfs" -noappend -comp zstd -processors 2 -no-progress
+    printf 'Official download/checksum and production conversion ran natively on ARM64.\nGuest imports this prepared profile and performs actual rescue, restore, reboot and first-user setup.\n' >"$evidence/profile-mode.txt"
+fi
 if [ "$distro" = fedora ]; then cp "$package" "$work/recovery/tool.rpm"; else cp "$package" "$work/recovery/tool.deb"; fi
 cp tests/vm-guest.sh tests/vm-observer.sh tests/drive-gui.mjs "$work/recovery/"
 printf 'REC_UUID=%s\nREC_MODE=%s\nREC_DISTRO=%s\nREC_FAULT=%s\nREC_CYCLES=%s\nREC_GUI=%s\n' "$recovery_uuid" "$mode" "$distro" "$fault" "${RESET_CYCLES:-1}" "${GUI_ACCEPTANCE:-no}" >"$work/recovery/lfr-qa.conf"

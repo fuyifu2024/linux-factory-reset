@@ -106,6 +106,8 @@ if [[ $REC_GUI == yes && $cycle -eq 1 ]]; then
 fi
 if [[ $REC_MODE == automatic ]]; then
     linux-factory-reset prepare-auto --storage /mnt/recovery
+elif [[ $REC_MODE == profile ]]; then
+    linux-factory-reset prepare-image --file /mnt/recovery/pristine.squashfs --storage /mnt/recovery
 else
     linux-factory-reset prepare-image --file /mnt/recovery/pristine.raw --storage /mnt/recovery
 fi

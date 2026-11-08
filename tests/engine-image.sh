@@ -82,5 +82,12 @@ uf_relocate "$platform" "$distro" "$work/root" "$work/esp" "$root_uuid" "$boot_u
 rm -f "$work/root/etc/systemd/system/multi-user.target.wants/ubuntu-reset-firstboot.service"
 sync; umount "$work/root"; umount "$work/esp"; losetup -d "$loop"; loop=''
 # Release intermediate image space before the guest downloads its own real official source.
-rm -rf "$work/source.raw" "$work/source.qcow2" "$work/profile" "$work/factory.squashfs"
-sh tests/real-boot.sh "$work/flat.raw" "$package" "$evidence" automatic "$distro" "$fault"
+rm -rf "$work/source.raw" "$work/source.qcow2" "$work/profile"
+if [[ $source_arch == arm64 ]]; then
+    # Conversion has already run natively with the production converter above.
+    # TCG acceptance exercises the production prepared-profile import and actual
+    # offline restore, rather than repeating image conversion under emulation.
+    ARM_PROFILE_SOURCE="$work/factory.squashfs" sh tests/real-boot.sh "$work/flat.raw" "$package" "$evidence" profile "$distro" "$fault"
+else
+    sh tests/real-boot.sh "$work/flat.raw" "$package" "$evidence" automatic "$distro" "$fault"
+fi
