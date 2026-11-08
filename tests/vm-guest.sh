@@ -11,6 +11,8 @@ if [[ $REC_FAULT != none ]] && grep -qx ROLLED_BACK /mnt/recovery/ubuntu-reset/r
     grep -qx 'old home' /home/lfr_old_user/private
     grep -qx 'extra software' /opt/lfr-extra/unwanted
     test ! -e /var/lib/ubuntu-reset/request
+    linux-factory-reset cancel
+    linux-factory-reset cancel
     echo PASS >/var/lib/lfr-qa-result; sync; echo LFR_VM_ROLLBACK_PASS >/dev/console
     systemctl --no-block poweroff; exit 0
 fi

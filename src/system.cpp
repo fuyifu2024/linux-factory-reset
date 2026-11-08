@@ -624,10 +624,18 @@ void cancel() {
             if (fs::exists(rescue)) {
                 secure(rescue);
                 need(!fs::exists(rescue / "phase") || !fs::exists(rescue / "active"), "Restore has already started; use the independent rescue rollback entry");
-                auto order = read(rescue / "original-order"); while (!order.empty() && order.back() == '\n') order.pop_back();
-                need(std::regex_match(order, std::regex("[0-9A-Fa-f,]+")), "Invalid original BootOrder");
-                run({"efibootmgr", "--bootorder", order});
-                if (fs::exists(rescue / "entry")) { auto entry = read(rescue / "entry"); while (!entry.empty() && entry.back() == '\n') entry.pop_back(); need(std::regex_match(entry, std::regex("[0-9A-Fa-f]{4}")), "Invalid rescue entry"); run({"efibootmgr", "--bootnum", entry, "--delete-bootnum"}); }
+                if (fs::exists(rescue / "active") || fs::exists(REQUEST)) {
+                    auto order = read(rescue / "original-order"); while (!order.empty() && order.back() == '\n') order.pop_back();
+                    need(std::regex_match(order, std::regex("[0-9A-Fa-f,]+")), "Invalid original BootOrder");
+                    run({"efibootmgr", "--bootorder", order});
+                }
+                if (fs::exists(rescue / "entry")) {
+                    auto entry = read(rescue / "entry"); while (!entry.empty() && entry.back() == '\n') entry.pop_back();
+                    need(std::regex_match(entry, std::regex("[0-9A-Fa-f]{4}")), "Invalid rescue entry");
+                    std::istringstream listing(output({"efibootmgr"})); std::string line;
+                    while (std::getline(listing, line)) if (line.starts_with("Boot" + entry) && line.find("Linux Factory Reset " + state.at("id").get<std::string>().substr(0,8)) != std::string::npos)
+                        run({"efibootmgr", "--bootnum", entry, "--delete-bootnum"});
+                }
                 fs::remove_all("/boot/efi/EFI/LinuxFactoryReset"); fs::remove_all(rescue);
             }
         }
