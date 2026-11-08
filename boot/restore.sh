@@ -30,6 +30,19 @@ uf_normal_order() {
     efibootmgr --bootorder "$uf_order" || return 1
 }
 uf_finish() {
+    mount -t ext4 -o remount,rw "$UF_ROOT_DEV" "$UF_TARGET" || return 1
+    if [ "$UF_PLATFORM" != raspi-arm64 ]; then
+        if [ "$1" = ROLLED_BACK ]; then
+            # The old files are durable. A second interruption during cleanup
+            # must finish cleanup rather than read a partly deleted backup.
+            UF_WRITING=0
+            uf_phase ROLLED_BACK || return 1
+        fi
+        if [ "$1" = ROLLED_BACK ] || [ "$1" = CANCELLED ]; then
+            rm -rf "$UF_RESCUE/previous" "$UF_RESCUE/backup-ready" || return 1
+            sync
+        fi
+    fi
     rm -rf "$UF_TARGET/var/lib/ubuntu-reset" || return 1
     sync
     if [ "$UF_PLATFORM" != raspi-arm64 ]; then
@@ -61,9 +74,6 @@ uf_rollback() {
     uf_reconcile "$UF_RESCUE/previous/root" "$UF_TARGET" "$UF_RESCUE/previous/boot" /run/uf-boot || return 1
     sync
     uf_finish ROLLED_BACK || return 1
-    # Backup may contain old personal data; delete after the old system is durable.
-    rm -rf "$UF_RESCUE/previous" "$UF_RESCUE/backup-ready" || return 1
-    sync
     umount /run/uf-boot || return 1
     mount -t ext4 -o remount,ro "$UF_ROOT_DEV" "$UF_TARGET" || return 1
     echo 'LFR_ROLLBACK_COMPLETE' >/dev/console
@@ -143,6 +153,14 @@ fi
 mount -t vfat -o iocharset=ascii,utf8=1,codepage=437 "$UF_BOOT_DEV" /run/uf-boot || uf_fail 'Cannot mount boot partition'
 if [ -f "$UF_RESCUE/phase" ] && [ "$(cat "$UF_RESCUE/phase")" = COMMITTED ]; then
     uf_commit || uf_fail 'Cannot complete committed recovery cleanup'
+fi
+if [ -f "$UF_RESCUE/phase" ] && [ "$(cat "$UF_RESCUE/phase")" = ROLLED_BACK ]; then
+    uf_finish ROLLED_BACK || uf_fail 'Cannot complete rollback cleanup'
+    sync
+    umount /run/uf-boot || uf_fail 'Cannot flush rollback boot filesystem'
+    mount -t ext4 -o remount,ro "$UF_ROOT_DEV" "$UF_TARGET" || uf_fail 'Cannot flush rollback root'
+    reboot -f
+    uf_fail 'Reboot after rollback cleanup failed'
 fi
 if [ -f "$UF_RESCUE/phase" ] && [ "$(cat "$UF_RESCUE/phase")" = WRITING ]; then
     UF_WRITING=1

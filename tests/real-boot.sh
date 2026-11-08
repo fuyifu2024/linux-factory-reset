@@ -115,8 +115,8 @@ set -o pipefail
             id lfrqatest
             passwd -S root
             if test -e /etc/fedora-release && test "$(getenforce)" != Enforcing; then echo LFR_VM_SELINUX_FAIL; systemctl --no-block poweroff; exit 1; fi
-            # Debian reports L, Fedora reports LK. Check the actual locked field
-            # without ever printing password hashes into evidence.
+            # Check the locked field without relying on passwd implementation
+            # status formatting or printing password hashes into evidence.
             root_locked=0
             while IFS=: read -r account credential remainder; do
                 if [[ $account == root && $credential =~ ^[!*]+$ ]]; then root_locked=1; fi
