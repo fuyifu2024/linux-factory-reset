@@ -1,0 +1,36 @@
+name: Beta bug / 公测问题
+description: Report a reproducible problem / 反馈可复现问题
+title: '[Beta] '
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version / 版本
+      description: Output of linux-factory-reset --version
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Distribution, architecture and VM/hardware / 发行版、架构、虚拟机或硬件
+      placeholder: Ubuntu 26.04, ARM64, UEFI VM
+    validations:
+      required: true
+  - type: textarea
+    id: layout
+    attributes:
+      label: Disk layout / 磁盘布局
+      description: Root/ESP/recovery filesystem types and Secure Boot state / 根分区、ESP、恢复盘文件系统及 Secure Boot 状态
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps and expected/actual result / 操作步骤及预期、实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Error and logs / 错误与日志
+      description: Include the actual error; omit passwords, keys and personal files / 请提供实际错误，勿上传密码、密钥和个人文件
