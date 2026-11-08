@@ -504,12 +504,16 @@ void prepare_profile(const std::string& url, const std::string& sum, const fs::p
     check_profile(profile, st);
     register_profile(profile, st, {{"url", url}, {"sha256", sum}});
 }
-fs::path preflight(const json& s) {
-    validate_state(s); auto hw = hardware();
-    need(hw["platform"] == s["platform"] && hw.at("distro").get<std::string>() == state_distro(s) && hw["root"]["uuid"] == s["root_uuid"] && hw["boot"]["uuid"] == s["boot_uuid"], "Target layout/distribution changed; prepare a new recovery profile");
+static fs::path recorded_profile(const json& s) {
     auto mounts = json::parse(output({"findmnt", "--json", "--source", "UUID=" + s.at("store_uuid").get<std::string>(), "-o", "TARGET"}));
     need(mounts.at("filesystems").size() == 1, "Mount the prepared recovery partition first");
     auto path = fs::path(mounts["filesystems"][0].at("target").get<std::string>()) / s.at("file").get<std::string>();
+    secure(path.parent_path()); return path;
+}
+fs::path preflight(const json& s) {
+    validate_state(s); auto hw = hardware();
+    need(hw["platform"] == s["platform"] && hw.at("distro").get<std::string>() == state_distro(s) && hw["root"]["uuid"] == s["root_uuid"] && hw["boot"]["uuid"] == s["boot_uuid"], "Target layout/distribution changed; prepare a new recovery profile");
+    auto path = recorded_profile(s);
     secure(path); need(sha256(path) == s.at("sha256").get<std::string>(), "Recovery profile is damaged or changed");
     // Re-audit old profiles before preparing an initramfs or writing the request marker.
     Mount source(path, "squashfs", "ro,loop,nosuid,nodev,noexec");
@@ -560,10 +564,11 @@ void cancel() {
     if (fs::exists(STATE)) {
         auto state = load_state();
         if (state.at("platform") != "raspi-arm64") {
-            auto profile = preflight(state); auto rescue = profile.parent_path() / ("rescue-" + state.at("id").get<std::string>());
+            need(filesystem("/boot/efi").at("uuid") == state.at("boot_uuid"), "ESP identity changed; cancellation will not modify it");
+            auto profile = recorded_profile(state); auto rescue = profile.parent_path() / ("rescue-" + state.at("id").get<std::string>());
             if (fs::exists(rescue)) {
                 secure(rescue);
-                need(!fs::exists(rescue / "phase"), "Restore has already started; use the independent rescue rollback entry");
+                need(!fs::exists(rescue / "phase") || !fs::exists(rescue / "active"), "Restore has already started; use the independent rescue rollback entry");
                 auto order = read(rescue / "original-order"); while (!order.empty() && order.back() == '\n') order.pop_back();
                 need(std::regex_match(order, std::regex("[0-9A-Fa-f,]+")), "Invalid original BootOrder");
                 run({"efibootmgr", "--bootorder", order});
