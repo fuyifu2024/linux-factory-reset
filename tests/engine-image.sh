@@ -75,6 +75,13 @@ if [[ $source_arch == arm64 ]]; then
     fi
     umount "$work/root/proc"
     touch "$work/root/etc/lfr-qa-preinstalled"
+    if [[ $distro == ubuntu ]]; then
+        # This is a supported initramfs-tools configuration on only the starting
+        # disposable VM, not a builder mock or a change to the pristine profile.
+        mkdir -p "$work/root/etc/initramfs-tools/conf.d"
+        printf 'MODULES=dep\nCOMPRESS=gzip\nCOMPRESSLEVEL=1\n' >"$work/root/etc/initramfs-tools/conf.d/99-lfr-qa-fast"
+        printf 'Starting TCG guest uses MODULES=dep and gzip level 1 for real rescue generation.\nThe pristine factory profile retains its original initramfs configuration.\n' >"$evidence/tcg-initramfs.txt"
+    fi
 fi
 . boot/relocate.sh
 uf_relocate "$platform" "$distro" "$work/root" "$work/esp" "$root_uuid" "$boot_uuid"

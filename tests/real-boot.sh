@@ -162,6 +162,7 @@ test ! -e "$work/target/home/lfr_old_user"
 test ! -e "$work/target/root/lfr-private"
 test ! -e "$work/target/opt/lfr-extra/unwanted"
 test ! -e "$work/target/var/lib/ubuntu-reset/request"
+test ! -e "$work/target/etc/initramfs-tools/conf.d/99-lfr-qa-fast"
 else
     grep -q '^lfr_old_user:' "$work/target/etc/passwd"
     grep -qx 'old private data' "$work/target/root/lfr-private"
