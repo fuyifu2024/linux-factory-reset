@@ -10,7 +10,9 @@ copy_file script /usr/lib/ubuntu-reset/relocate.sh /usr/lib/ubuntu-reset/relocat
 copy_file script /usr/lib/ubuntu-reset/restore.sh /usr/lib/ubuntu-reset/restore.sh
 # Do not rely on the distro-specific BusyBox applet whitelist.
 for tool in rsync sha256sum du df stat find cat readlink grep sed awk mkdir rm mv sync sleep; do
-    copy_exec "/usr/bin/$tool" "/usr/bin/$tool"
+    # Ubuntu's coreutils alternatives may be absolute links outside the initrd.
+    # Copy their actual executable under the applet name, with its shared libraries.
+    copy_exec "$(readlink -f "/usr/bin/$tool")" "/usr/bin/$tool"
 done
 copy_exec "$(command -v efibootmgr)" /usr/bin/efibootmgr
 copy_exec /usr/sbin/blkid /usr/sbin/blkid
