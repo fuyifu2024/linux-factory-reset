@@ -28,19 +28,25 @@ async function tick() {
   }
   await pause(250);
 }
-async function waitFor(predicate, label, timeout=900000) {
+async function waitFor(predicate, label, timeout=120000) {
   const end=Date.now()+timeout;while(Date.now()<end){await tick();const d=dialog();if(d&&predicate(d))return d;}throw Error('GUI timeout: '+label);
 }
 async function keys(d, ...values) {run('xdotool',['windowactivate','--sync',d.w]);run('xdotool',['key','--clearmodifiers',...values]);await pause(400);}
 async function main(row) {const d=await waitFor(d=>d.args.includes('--column=状态'),'main');await keys(d,'Home',...Array(row).fill('Down'),'Return');}
-async function info(expected) {
-  const d=await waitFor(d=>d.args.includes('--text-info'),'result');
+async function info(expected, timeout=120000) {
+  const d=await waitFor(d=>d.args.includes('--text-info'),'result',timeout);
   const arg=d.args.find(x=>x.startsWith('--filename='));const text=fs.readFileSync(arg.slice(11),'utf8');
   fs.appendFileSync(dir+'/messages.txt',text+'\n');
   if(expected&&!text.includes(expected))throw Error('Unexpected GUI result: '+text.slice(0,1200));
   await keys(d,'alt+F4');return text;
 }
-async function chooseDirectory(path) {const d=await waitFor(d=>d.args.includes('--directory'),'directory');await keys(d,'ctrl+l');run('xdotool',['type','--clearmodifiers',path]);await keys(d,'Return');}
+async function chooseDirectory(path) {
+  const d=await waitFor(d=>d.args.includes('--directory'),'directory');
+  await keys(d,'ctrl+l');run('xdotool',['type','--clearmodifiers',path]);await keys(d,'Return');
+  // Enter in GTK's location entry navigates into a folder. Activate the real
+  // Select button as a separate action (the application uses the C locale).
+  await keys(d,'alt+s');log('Selected directory '+path);
+}
 async function confirm(value) {
   const d=await waitFor(d=>d.args.includes('--entry'),'confirmation');
   cp.execFileSync('xclip',['-selection','clipboard'],{input:value,stdio:['pipe','ignore','ignore']});await keys(d,'ctrl+v','Return');
@@ -51,7 +57,7 @@ try {
   let d=await waitFor(d=>d.args.includes('--column=来源'),'source');await keys(d,'Home','Down','Return');
   await info('请选择独立 ext4');await chooseDirectory('/mnt/recovery');
   await info('请选择一个用于暂存');await chooseDirectory('/home/lfr_old_user');
-  await info('操作已完成');log('Official download and privileged image preparation completed');
+  await info('操作已完成',900000);log('Official download and privileged image preparation completed');
   await main(2);await info('这是只读预览');log('Actual root/ESP preview completed');
   await main(3);await confirm('wrong confirmation');
   await waitFor(d=>d.args.includes('--column=状态'),'wrong-confirmation return');log('Wrong destructive confirmation rejected');
@@ -64,4 +70,8 @@ try {
   await main(3);fs.writeFileSync(dir+'/begin-restore','1');await confirm('清空全部用户');
   log('Real GUI submitted confirmed reset/reboot');
   for(let i=0;i<100;i++)await tick();
-} catch(e) {log(e.stack);process.exit(1);}
+} catch(e) {
+  log(e.stack);try{run('scrot',['--overwrite',dir+'/failure.png']);}catch{}
+  const d=dialog();if(d)log('Remaining real dialog: '+JSON.stringify(d.args));
+  process.exit(1);
+}
