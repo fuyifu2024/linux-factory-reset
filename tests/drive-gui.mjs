@@ -38,7 +38,7 @@ async function info(expected) {
   const arg=d.args.find(x=>x.startsWith('--filename='));const text=fs.readFileSync(arg.slice(11),'utf8');
   fs.appendFileSync(dir+'/messages.txt',text+'\n');
   if(expected&&!text.includes(expected))throw Error('Unexpected GUI result: '+text.slice(0,1200));
-  await keys(d,'Return');return text;
+  await keys(d,'alt+F4');return text;
 }
 async function chooseDirectory(path) {const d=await waitFor(d=>d.args.includes('--directory'),'directory');await keys(d,'ctrl+l');run('xdotool',['type','--clearmodifiers',path]);await keys(d,'Return');}
 async function confirm(value) {
