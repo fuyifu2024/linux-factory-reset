@@ -5,9 +5,21 @@ const [socketPath, logPath, fault = "none"] = process.argv.slice(2);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const deadline = Date.now() + Number(process.env.VM_TIMEOUT_MINUTES || 30) * 60 * 1000;
 const recoveryLimit = process.env.SOURCE_ARCH === 'arm64' ? 1800000 : 600000;
-let typed = false, armedAt = 0, setupAt = 0, setups = 0;
+let typed = false, armedAt = 0, setupAt = 0, setups = 0, phaseOffset = -1;
 while (Date.now() < deadline) {
   const log = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf8') : '';
+  // TCG can spend minutes in each real phase. Reset the phase deadline only
+  // for a new production milestone; the overall deadline remains unchanged.
+  if (process.env.SOURCE_ARCH === 'arm64') {
+    for (const marker of ['LFR_VM_READY_TO_ARM',
+      'Ubuntu Reset: verifying recovery media; do not remove power.',
+      'Linux Factory Reset: saving temporary rollback copy.',
+      'Ubuntu Reset: removing users/data and restoring initial system files.',
+      'Ubuntu Reset complete. Restarting into initial setup.']) {
+      const offset = log.lastIndexOf(marker);
+      if (offset > phaseOffset) {phaseOffset = offset; armedAt = Date.now(); console.log('ARM recovery phase: '+marker);}
+    }
+  }
   if (fault === 'powercut' && log.includes('LFR_VM_POWER_CUT_READY')) process.exit(42);
   if (log.includes('LFR_VM_ROLLBACK_PASS')) { await delay(4000); process.exit(0); }
   const seen = (log.match(/LFR_VM_AWAITING_NEW_USER/g) || []).length;

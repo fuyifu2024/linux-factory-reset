@@ -82,6 +82,30 @@ jobs:
         with:
           name: progress-3-${{ inputs.distro }}-${{ inputs.arch }}-${{ inputs.fault }}
           path: evidence/
+      - name: Offline copy checkpoint
+        run: |
+          for i in $(seq 1 180); do
+            test ! -f evidence/test-exit || break
+            if grep -Fq 'Ubuntu Reset: removing users/data and restoring initial system files.' evidence/vm-serial.txt 2>/dev/null; then break; fi
+            sleep 10
+          done
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: progress-4-${{ inputs.distro }}-${{ inputs.arch }}-${{ inputs.fault }}
+          path: evidence/
+      - name: Restored boot checkpoint
+        run: |
+          for i in $(seq 1 180); do
+            test ! -f evidence/test-exit || break
+            if grep -Fq 'Ubuntu Reset complete. Restarting into initial setup.' evidence/vm-serial.txt 2>/dev/null; then break; fi
+            sleep 10
+          done
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: progress-5-${{ inputs.distro }}-${{ inputs.arch }}-${{ inputs.fault }}
+          path: evidence/
       - name: Await and verify actual VM result
         run: |
           for i in $(seq 1 900); do
