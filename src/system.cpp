@@ -283,6 +283,12 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
         fs::permissions(r / "etc/netplan/90-factory.yaml", fs::perms::owner_read | fs::perms::owner_write);
     }
     if (meta.at("distro") == "fedora") {
+        // This one-time local account administrator is an init script, not PID 1.
+        // Fedora's targeted policy permits password administration in initrc_t.
+        // Enter through bash (a valid shell entrypoint) rather than a generic usr_t file.
+        auto context = r / "etc/systemd/system/ubuntu-reset-firstboot.service.d/selinux.conf";
+        require_inside(r, context); fs::create_directories(context.parent_path());
+        write(context, "[Service]\nSELinuxContext=system_u:system_r:initrc_t:s0\nExecStart=\nExecStart=/usr/bin/bash /usr/lib/ubuntu-reset/firstboot.sh\n");
         require_inside(r, r / "etc/kernel/cmdline"); fs::create_directories(r / "etc/kernel"); write(r / "etc/kernel/cmdline", "root=UUID=@ROOT_UUID@ ro\n");
         // Cloud-init is disabled, so networking must not rely on cloud metadata.
         auto network = r / "etc/NetworkManager/system-connections/factory-dhcp.nmconnection";
