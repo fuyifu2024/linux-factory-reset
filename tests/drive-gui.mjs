@@ -33,6 +33,10 @@ async function waitFor(predicate, label, timeout=120000) {
   const end=Date.now()+timeout;while(Date.now()<end){await tick();const d=dialog();if(d&&predicate(d))return d;}throw Error('GUI timeout: '+label);
 }
 async function keys(d, ...values) {run('xdotool',['windowactivate','--sync',d.w]);run('xdotool',['key','--clearmodifiers',...values]);await pause(400);}
+async function paste(d,value) {
+  cp.execFileSync('xclip',['-selection','clipboard'],{input:value,stdio:['pipe','ignore','ignore'],timeout:15000});
+  await keys(d,'ctrl+a','ctrl+v');
+}
 async function main(row) {const d=await waitFor(d=>d.args.includes('--column=状态'),'main');await keys(d,'Home',...Array(row).fill('Down'),'Return');}
 async function info(expected, timeout=120000) {
   const d=await waitFor(d=>d.args.includes('--text-info'),'result',timeout);
@@ -43,14 +47,16 @@ async function info(expected, timeout=120000) {
 }
 async function chooseDirectory(path) {
   const d=await waitFor(d=>d.args.includes('--directory'),'directory');
-  await keys(d,'ctrl+l');run('xdotool',['type','--clearmodifiers',path]);await keys(d,'Return');
+  await keys(d,'ctrl+l');await paste(d,path+'/');
+  run('scrot',['--overwrite',dir+(path==='/mnt/recovery'?'/directory-recovery.png':'/directory-download.png')]);
+  await keys(d,'Return');
   // Enter in GTK's location entry navigates into a folder. Activate the real
   // Select button as a separate action (the application uses the C locale).
   await keys(d,'alt+s');log('Selected directory '+path);
 }
 async function confirm(value) {
   const d=await waitFor(d=>d.args.includes('--entry'),'confirmation');
-  cp.execFileSync('xclip',['-selection','clipboard'],{input:value,stdio:['pipe','ignore','ignore'],timeout:15000});await keys(d,'ctrl+v','Return');
+  await paste(d,value);await keys(d,'Return');
 }
 try {
   await main(2);await info('请先选择并准备恢复镜像');log('Unprepared preview guarded');
