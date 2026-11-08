@@ -166,7 +166,7 @@ int main() {
         rejects([&] {make_profile(r, b, "raspi-arm64", tmp.path / "bad.squashfs", {});}, "personal reference rejected");
         // Build real Squashfs profiles for both distros/architectures from synthetic,
         // non-executable file trees. No firmware or running root is modified.
-        for (const auto& distro_version : {std::pair<std::string, std::string>{"ubuntu", "24.04"}, {"debian", "12"}, {"debian", "13"}, {"fedora", "45"}}) {
+        for (const auto& distro_version : {std::pair<std::string, std::string>{"ubuntu", "24.04"}, {"ubuntu", "26.04"}, {"debian", "12"}, {"debian", "13"}, {"fedora", "45"}}) {
             for (const std::string platform : {"arm64-uefi", "x86_64-uefi"}) {
                 const auto& [distro, version] = distro_version;
                 auto grubpath = distro == "fedora" ? "boot/grub2/grub.cfg" : "boot/grub/grub.cfg";
@@ -188,6 +188,12 @@ int main() {
                 write(ur / "usr/lib/sysimage/rpm/rpmdb.sqlite", "synthetic fixture database");
                 write(ur / "var/lib/dpkg/status", "Package: base-files\nStatus: install ok installed\n");
                 for (const auto& tool : {"usr/bin/sudo", "usr/bin/passwd", "usr/sbin/useradd", "usr/sbin/usermod"}) write(ur / tool, image_elf);
+                if (distro == "ubuntu" && version == "26.04") {
+                    fs::create_directories(ur / "etc/alternatives"); fs::create_directories(ur / "usr/lib/cargo/bin");
+                    fs::remove(ur / "usr/bin/sudo"); write(ur / "usr/lib/cargo/bin/sudo", image_elf);
+                    fs::create_symlink("/etc/alternatives/sudo", ur / "usr/bin/sudo");
+                    fs::create_symlink("/usr/lib/cargo/bin/sudo", ur / "etc/alternatives/sudo");
+                }
                 write(ur / grubpath, "linux /boot/vmlinuz root=UUID=01234567-abcd ro\n");
                 write(efi / "grub.cfg", "search.fs_uuid 01234567-abcd root\nset prefix=($root)/boot/grub\n");
                 auto loader = efi / (platform == "arm64-uefi" ? "grubaa64.efi" : "grubx64.efi");

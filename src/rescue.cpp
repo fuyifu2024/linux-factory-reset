@@ -19,9 +19,11 @@ void install_rescue(const json& s, const fs::path& profile, const fs::path& init
     auto order = match[1].str();
     auto recovery = profile.parent_path() / ("rescue-" + s.at("id").get<std::string>());
     need(!fs::exists(recovery), "Rescue entry already exists; cancel the previous arm operation first");
-    fs::create_directory(recovery); fs::permissions(recovery, fs::perms::owner_all);
     auto esp = fs::path("/boot/efi/EFI/LinuxFactoryReset");
     need(!fs::exists(esp), "An existing LinuxFactoryReset EFI directory needs cancellation/inspection first");
+    fs::create_directory(recovery); fs::permissions(recovery, fs::perms::owner_all);
+    std::string entry; bool firmware_attempted = false;
+    try {
     auto source_kernel = fs::path("/boot") / ("vmlinuz-" + kernel);
     need(fs::is_regular_file(source_kernel), "Running kernel image unavailable for independent rescue");
     need(fs::space(recovery).available > fs::file_size(source_kernel) + fs::file_size(initrd) + (1ULL << 30), "Recovery partition too small for rescue kernel/initrd");
@@ -47,8 +49,9 @@ void install_rescue(const json& s, const fs::path& profile, const fs::path& init
     while (!number.empty() && number.back() == '\n') number.pop_back();
     need(std::regex_match(disk, std::regex("[A-Za-z0-9._-]+")) && std::regex_match(number, std::regex("[0-9]+")), "Cannot identify ESP disk/partition");
     auto before = output({"efibootmgr"});
+    firmware_attempted = true;
     run({"efibootmgr", "--create-only", "--disk", "/dev/" + disk, "--part", number, "--label", "Linux Factory Reset " + id.substr(0,8), "--loader", "\\EFI\\LinuxFactoryReset\\" + loader});
-    auto after = output({"efibootmgr"}); std::istringstream lines(after); std::string line, entry;
+    auto after = output({"efibootmgr"}); std::istringstream lines(after); std::string line;
     while (std::getline(lines, line)) if (line.find("Linux Factory Reset " + id.substr(0,8)) != std::string::npos) {
         need(line.size() > 8 && line.starts_with("Boot") && before.find(line.substr(0,8)) == std::string::npos && entry.empty(), "Ambiguous rescue boot entry"); entry = line.substr(4,4);
     }
@@ -58,5 +61,19 @@ void install_rescue(const json& s, const fs::path& profile, const fs::path& init
     atomic_write(REQUEST, id + "\n");
     atomic_write(recovery / "active", id + "\n"); sync();
     run({"efibootmgr", "--bootorder", entry + "," + order});
+    } catch (...) {
+        // If firmware rollback fails, retain the loader and journal rather than
+        // deleting the only remaining entry firmware might try to boot.
+        try {
+            bool restored = !firmware_attempted || command({"efibootmgr", "--bootorder", order}).code == 0;
+            if (restored) {
+                if (!entry.empty()) command({"efibootmgr", "--bootnum", entry, "--delete-bootnum"});
+                fs::remove_all(esp); fs::remove_all(recovery);
+                if (fs::exists(REQUEST) && read(REQUEST) == s.at("id").get<std::string>() + "\n") fs::remove(REQUEST);
+                sync();
+            }
+        } catch (...) { /* Leave recoverable state for the explicit cancel command. */ }
+        throw;
+    }
 }
 }
