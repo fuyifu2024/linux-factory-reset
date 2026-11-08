@@ -1,83 +1,63 @@
 # Linux Factory Reset
 
-[English](README.en.md) · [下载 / Releases](https://github.com/fuyifu2024/linux-factory-reset/releases) · [验证范围](docs/validation.md)
+[English](README.en.md) · [下载 / Releases](https://github.com/fuyifu2024/linux-factory-reset/releases) · [验收记录](docs/validation/v0.5.0-alpha.1.md)
 
-C++20 编写的 Linux 镜像下载与实验性恢复工具。项目由 `ubuntu-reset` 更名，旧命令仍可使用。
+C++20 编写的 Linux 官方镜像下载与实验性恢复工具，恢复阶段使用少量 Shell。原名 `ubuntu-reset`，旧命令仍兼容。
 
-**当前是开发预览版，还不能作为任意 Linux 电脑的通用“一键恢复出厂设置”。** Debian 13 AMD64 UEFI 虚拟机已通过实际恢复、旧用户及测试文件删除、新管理员创建和关机后的磁盘检查；物理硬件、ARM64 启动和其他发行版的恢复仍需验证。详见 [v0.4 验收记录](docs/validation/v0.4.0-alpha.1.md)。
+**v0.5 是实验性开发预览版，仅面向验收记录列出的系统与布局。** Ubuntu 26.04、Debian 13、Fedora 45 的 AMD64 UEFI 虚拟机已完成真实自动恢复、旧用户及文件删除、新管理员创建和 sudo 检查；ARM64 已验证原生构建和镜像转换，尚未验证客体启动。具体范围及故障测试见验收记录。
 
-## 现在能做什么
-
-| 功能 | 实际状态 |
+| 功能 | 范围 |
 | --- | --- |
-| 官网镜像下载 | Ubuntu 24.04 / 26.04、Debian 当前稳定版、Fedora 最新稳定版；AMD64 / ARM64 |
-| 下载进度 | 百分比、已下载大小、平均速度、预计剩余时间、取消；官网未提供大小时显示“大小未知” |
-| 镜像完整性 | 下载后比较官网 HTTPS 元数据中的 SHA-256，不一致不保存成最终文件；ISO 下载器尚未验独立 PGP 签名 |
-| 导入本地恢复资料 | IMG / RAW、XZ 压缩磁盘镜像、独立 QCOW2、本项目 Squashfs；需要符合恢复布局的干净已安装系统 |
-| Debian / Ubuntu 恢复后端 | 实验性；普通 ext4 根分区 + 单独 FAT ESP，标准 GRUB，ARM64 / x86_64 UEFI；原生 Ubuntu Pi 引导自动识别 |
-| 安装 ISO 自动恢复 | **尚未实现**。下载 ISO 不会启用恢复按钮或设置恢复标记 |
-| Fedora 恢复后端 | **尚未实现**。当前支持其官网下载；RPM / dracut / SELinux / Btrfs 恢复适配待开发 |
-| Linux Mint | 尚未接入，不假设存在官方 ARM64 镜像 |
+| 官网 ISO 下载 | Ubuntu 24.04/26.04、Debian 稳定版、Fedora 稳定版；AMD64/ARM64 |
+| 下载显示 | 百分比、大小、平均速度、预计时间、取消；校验成功后才保存最终文件 |
+| 内置自动恢复源 | Debian 13 NoCloud、Ubuntu 24.04/26.04 Server、Fedora 44/45 Cloud Base；另自动识别原生 Ubuntu Pi 引导 |
+| 本地来源 | IMG/RAW、IMG.XZ/RAW.XZ、独立 QCOW2、本项目 Squashfs；必须是可信的干净已安装系统 |
+| 通用恢复目标 | ext4 根分区 + 单独 FAT ESP、标准 GRUB、x86_64/ARM64 UEFI；当前独立救援入口要求 Secure Boot 已关闭 |
+| 恢复引擎 | Debian/Ubuntu initramfs-tools；Fedora dracut、SELinux 首次开户及 wheel 管理员 |
+| 救援与回退 | 临时独立 EFI 启动入口、离线回退副本、恢复阶段记录；写入失败或中断后回退，成功后清除临时个人资料 |
+| 尚不支持 | 安装 ISO 自动恢复、Btrfs **目标**、LVM、加密、RAID、额外 `/boot` 或 `/home` 分区、共享/OEM ESP、Mint |
 
-ARM64 不限于树莓派。一般 ARM64 UEFI 虚拟机、服务器和兼容电脑使用同一界面。原生 U-Boot 等其他引导方式尚未适配。不能仅凭架构相同就互换板卡 IMG。
+**通用 UEFI 自动来源是不带桌面的基础/服务器系统，不会精确复原原来的桌面软件和配置。** Fedora 官方 Btrfs 来源、Ubuntu 独立 `/boot` 来源可以在暂存区转换；这不表示当前已安装的 Btrfs 或独立 `/boot` 目标能够直接重置。ARM64 不限于树莓派，但通用路径要求 UEFI；其他原生 U-Boot/板卡固件仍需适配。
 
-## 安装与使用
+## 安装
 
-在 [发布页](https://github.com/fuyifu2024/linux-factory-reset/releases) 选择与系统及架构匹配的 `.deb`。发行版分别提供 Debian 12、Debian 13、Ubuntu 24.04 的 AMD64 / ARM64 构建。二进制需要对应系统的运行库；推荐安装 DEB 以获取依赖。
+从发布页选择与发行版、架构匹配的包。提供 Debian 12/13、Ubuntu 24.04 的 AMD64/ARM64 DEB，以及 Fedora 45 的双架构 RPM；单独二进制需要对应运行库。请以所下载 tag 的功能与验收范围为准。
 
 ```sh
 sudo apt install ./linux-factory-reset_*.deb
+# Fedora：sudo dnf install ./linux-factory-reset*.rpm
 linux-factory-reset gui
 ```
 
-界面统一提供“下载官方镜像”“准备恢复资料”“查看变更”“恢复系统”。不再要求普通用户自建 HTTPS 地址或手填校验值。自定义管理员恢复源保留在“高级功能”中。
+统一界面提供“下载官方镜像”“准备恢复资料”“查看变更”“恢复系统”“取消恢复”。普通流程不需要自建 HTTPS 地址或手填校验值。默认 Cairo 软件绘制，兼容缺少虚拟 GPU 驱动的环境；不会修改系统图形配置。
 
-下载官方镜像只需选择发行版、版本、架构和保存目录，不需要管理员权限、第二块磁盘。自动从官网取得地址及校验值；Fedora 不会选择 Beta。
+## 下载与恢复
+
+仅下载 ISO 不需要管理员权限或第二块磁盘，也不会触发恢复。下载器自动获取官网 HTTPS 地址及校验值，显示进度和速度，可取消；不会将 Fedora Beta 当成稳定版。
 
 ```sh
-linux-factory-reset catalog
-linux-factory-reset resolve --distro fedora --release stable --edition workstation --arch arm64
-linux-factory-reset download --distro debian --release stable --edition netinst --arch arm64 --directory ~/Downloads
+linux-factory-reset download --distro ubuntu --release 26.04 --edition desktop --arch arm64 --directory ~/Downloads
+linux-factory-reset resolve --distro fedora --release stable --edition workstation --arch amd64
 ```
 
-Ubuntu 可用 `--release 24.04` 或 `26.04`，`--edition desktop` 或 `server`；Fedora 使用 `--release stable`、`--edition workstation` 或 `server`。官网没有所选架构/版本组合时，会明确报错，不切换到非官方镜像。可加 `--proxy http://127.0.0.1:7890`，也支持当前用户的代理环境变量。
+Ubuntu 下载类型为 `desktop` / `server`，Fedora 为 `workstation` / `server`，Debian 为 `netinst`。官网没有对应组合时停止。可加 `--proxy http://127.0.0.1:7890`。
 
-## 准备实验性恢复
-
-准备恢复资料需要另一个已挂载的 **ext4 恢复分区**；目前不会创建、格式化分区。虚拟机请先添加第二块虚拟硬盘。可以选择恢复分区内任意文件夹，程序会识别实际挂载点，把资料保存在该盘的 `ubuntu-reset/` 兼容目录。当前系统分区的普通文件夹不能替代恢复分区。
+恢复资料需要另一块已挂载的 **ext4 恢复盘**，并预留容纳初始镜像、临时文件和旧系统回退副本的空间。本程序不自动分区、格式化磁盘。虚拟机请先添加第二块虚拟硬盘；可选择该盘任意文件夹，程序自动识别挂载点。
 
 ```sh
-sudo linux-factory-reset prepare-image --file /path/to/pristine-system.img --storage /mnt/recovery/folder
+linux-factory-reset sources
+sudo linux-factory-reset prepare-auto --storage /mnt/recovery
+# 或：sudo linux-factory-reset prepare-image --file /path/to/pristine.img --storage /mnt/recovery
 sudo linux-factory-reset plan
-```
-
-镜像必须包含同发行版、同 CPU 架构、匹配引导方式的干净已安装系统：恰好一个 ext4 系统分区和一个 FAT 启动分区，无已有个人用户。ISO 安装盘、Live 根目录、增量 QCOW2、加密磁盘不能直接当作已安装系统。程序会先复制本地文件到私有暂存区，再以只读方式解析；文件计算的哈希只用于完整性记录，不证明来源可信。
-
-只有本机检测到已内置的恢复源时，“准备恢复资料”中才显示自动下载。当前开发分支内置 Debian 13 通用 AMD64/ARM64 UEFI 的官方 NoCloud 基础镜像，以及 Ubuntu 26.04 原生 Pi 引导镜像。Debian 来源用官方 HTTPS SHA-512 清单校验，原生 Ubuntu 来源另校验 OpenPGP 签名。下载在普通用户界面显示进度、速度和取消；管理员导入时重新检查暂存文件校验值。
-
-**Debian 自动来源是不带桌面的基础系统，恢复后在本地控制台创建新管理员。它不是本机最初桌面软件和配置的历史副本。** 普通 Ubuntu UEFI、Debian 12 等设备仍需本地已安装系统镜像或管理员制作的恢复资料；不能把服务器镜像宣传成原来的桌面系统。发布版本的验证情况请看对应 tag 的验收记录。**官网 ISO 下载与可自动恢复的资料不是同一件事。**
-
-“查看变更”需要先准备资料；未准备时会说明下一步，不再报 `Cannot inspect ...state.json`。完整性检查、比较可能较慢，界面显示忙碌状态，真实错误可复制。
-
-确认恢复的命令：
-
-```sh
 sudo linux-factory-reset arm --confirm ERASE-ALL-USERS --reboot
-# 在重启前取消：
-sudo linux-factory-reset cancel
+# 重启前取消：sudo linux-factory-reset cancel
 ```
 
-此操作会在下次 initramfs 启动阶段覆盖系统和启动文件，删除全部旧用户、个人文件、额外软件及配置。恢复介质必须一直连接。恢复不是断电事务，也不是磁盘安全擦除；不支持 Btrfs、LVM、加密、RAID、额外 `/home` 或 `/boot` 等分区。首次开机需要创建新管理员，不保留原账号。不会因为下载镜像或预览就恢复、重启、改 BIOS。
+准备、下载和预览都不会执行恢复。确认后下次启动离线覆盖系统及启动文件，删除所有旧个人账号、文件、额外软件和配置。恢复盘应始终连接。UEFI 启动顺序只在恢复期间临时调整，不会自动恢复 BIOS 默认值或关闭 Secure Boot。恢复后在本地控制台新建管理员，root 保持锁定。
 
-## 虚拟机图形兼容与升级
+完成正常恢复后清除临时回退副本及宿主恢复 initramfs；成功回退则有意恢复原账号和文件。它不是 A/B 系统、磁盘安全擦除或对损坏硬件的事务保证，不能覆盖任意恢复后驱动故障。原生 Ubuntu Pi 路径暂未加入此独立 UEFI 回退协议。细节见 [恢复协议](docs/recovery.md) 和 [资料制作](docs/profiles.md)。
 
-界面默认使用 Cairo 软件绘制，避免缺少 GPU 驱动时反复出现 Mesa / EGL / Zink 错误；不修改系统图形设置，保留用户显式设置。仍有问题可用终端运行以取得实际错误。
-
-```sh
-GSK_RENDERER=cairo LIBGL_ALWAYS_SOFTWARE=1 linux-factory-reset gui
-```
-
-原 `ubuntu-reset` 命令是兼容入口。内部状态、initramfs hook 及恢复资料目录保留旧名字，避免升级时出现两套恢复标记。新版 DEB 替换旧包，**不会**自动准备资料或设置恢复标记。
+官网 ISO 使用 HTTPS 元数据 SHA-256；Debian 恢复源使用 SHA-512，原生 Ubuntu Pi 来源另校验 OpenPGP。通用 Ubuntu 云镜像和 Fedora 来源使用官网 HTTPS SHA-256，尚未验证独立 PGP 签名。Fedora 镜像转换会以管理员权限运行可信来源中的 dracut；不要选择不可信系统镜像。
 
 ## 构建与验证
 
@@ -88,4 +68,4 @@ cmake --build build -j2
 ctest --test-dir build --output-on-failure
 ```
 
-依赖及集成测试见 [CI](.github/workflows/ci.yml)。测试使用临时目录、合成系统树、隔离容器里的本地 HTTPS 服务器和无 GPU 的虚拟显示。不会在开发者或用户主机上执行真实恢复。通过构建、目录恢复测试不等于证明真实系统能够恢复后启动。更多限制见 [验证记录](docs/validation.md)、[恢复协议](docs/recovery.md)。
+本项目的重编译、大镜像和真实恢复验收运行在云端一次性环境，不在用户的树莓派上执行。CI 包含原生 AMD64/ARM64 构建、包安装、HTTPS 下载/取消、无 GPU GUI 和临时目录测试；真实启动、清除用户、创建可 sudo 的新管理员及回退另由可丢弃 UEFI VM 验证。ARM64 镜像导入通过不代表 ARM 客体启动或物理硬件已验证。

@@ -1,83 +1,65 @@
 # Linux Factory Reset
 
-[简体中文](README.md) · [Releases](https://github.com/fuyifu2024/linux-factory-reset/releases) · [Validation](docs/validation.md)
+[中文](README.md) · [Releases](https://github.com/fuyifu2024/linux-factory-reset/releases) · [Acceptance evidence](docs/validation/v0.5.0-alpha.1.md)
 
-A C++20 official-image downloader and experimental Linux recovery tool. Renamed from `ubuntu-reset`; the old command remains a compatibility entry point.
+A C++20 official-image downloader and experimental Linux recovery tool, with small offline Shell components. Previously named `ubuntu-reset`; the old command remains compatible.
 
-**Development preview: this is not yet a universal one-click factory reset for arbitrary Linux installations.** A Debian 13 AMD64 UEFI VM passed actual restoration, removal of the old account/test files, new-administrator creation and powered-off disk checks. Physical hardware, ARM64 boot and other distributions still need runtime validation. See the [v0.4 acceptance record](docs/validation/v0.4.0-alpha.1.md).
+**v0.5 is an experimental preview for the systems and layouts listed in its acceptance record.** Actual AMD64 UEFI VMs running Ubuntu 26.04, Debian 13 and Fedora 45 have completed automatic restoration, old-account/file removal, new-administrator setup and real sudo checks. ARM64 has native build and source-conversion evidence, without guest-boot validation. Consult the exact evidence and fault-test scope.
 
-## Capabilities
-
-| Feature | Actual status |
+| Feature | Scope |
 | --- | --- |
-| Official downloads | Ubuntu 24.04 / 26.04, current stable Debian, latest stable Fedora; AMD64 and ARM64 |
-| Progress | Percentage, bytes, average speed, ETA and cancellation; unknown server sizes are labelled |
-| Integrity | SHA-256 from official HTTPS metadata; mismatches never become final files. Detached PGP signatures are not checked by the ISO downloader |
-| Local recovery import | IMG / RAW, XZ disk images, standalone QCOW2, project Squashfs; requires a compatible pristine installed system |
-| Debian / Ubuntu reset engine | Experimental ordinary ext4 root + separate FAT ESP, standard GRUB, ARM64/x86_64 UEFI; native Ubuntu Pi firmware detected internally |
-| Automatic installation from ISO | **Not implemented**. Downloading an ISO does not enable restoration or arm reset |
-| Fedora reset engine | **Not implemented**. Official download works; RPM, dracut, SELinux and Btrfs restoration remain future work |
-| Linux Mint | Not integrated; no official ARM64 image is assumed |
+| Official ISO downloads | Ubuntu 24.04/26.04, Debian stable, Fedora stable; AMD64/ARM64 |
+| Download display | Percentage, bytes, average speed, ETA, cancellation; final file published only after verification |
+| Automatic recovery sources | Debian 13 NoCloud, Ubuntu 24.04/26.04 Server, Fedora 44/45 Cloud Base; native Ubuntu Pi boot detected automatically |
+| Local sources | Trusted pristine installed-system IMG/RAW, IMG.XZ/RAW.XZ, standalone QCOW2 and project Squashfs profiles |
+| Generic targets | Plain ext4 root + separate FAT ESP, standard GRUB, x86_64/ARM64 UEFI; independent rescue currently requires Secure Boot already disabled |
+| Recovery engines | Debian/Ubuntu initramfs-tools; Fedora dracut, SELinux-aware first-user setup and wheel administrator |
+| Rescue and rollback | Temporary independent EFI entry, offline rollback copy and recovery journal; rollback after write failure/interruption, temporary personal data removed after success |
+| Not supported | Automatic installer-ISO deployment, Btrfs **targets**, LVM, encryption, RAID, separate `/boot` or `/home`, shared/OEM ESPs, Mint |
 
-ARM64 includes generic UEFI VMs, servers and compatible computers. Native U-Boot and other board boot flows are unsupported. Matching CPU architecture alone does not make board images interchangeable.
+**Generic automatic sources are base/server systems without a desktop. They do not recreate the exact original desktop installation.** Fedora's official Btrfs source and Ubuntu split-boot sources can be normalized in staging; existing Btrfs or split-boot targets remain unsupported. ARM64 is not limited to Raspberry Pi, but generic devices need UEFI; other native board firmware/U-Boot flows need adapters.
 
-## Install and use
+## Install
 
-Choose the `.deb` matching your system and architecture from [Releases](https://github.com/fuyifu2024/linux-factory-reset/releases). Debian 12, Debian 13 and Ubuntu 24.04 builds are provided for AMD64/ARM64. Prefer DEB installation to resolve runtime dependencies.
+Choose the package matching your distribution and architecture. Builds cover Debian 12/13 and Ubuntu 24.04 AMD64/ARM64 DEBs, plus Fedora 45 RPMs for both architectures. Standalone binaries need matching runtime libraries. Use the capabilities and evidence of the tag you download.
 
 ```sh
 sudo apt install ./linux-factory-reset_*.deb
+# Fedora: sudo dnf install ./linux-factory-reset*.rpm
 linux-factory-reset gui
 ```
 
-The unified interface offers official downloads, recovery preparation, a change preview and restoration. Ordinary users do not need to host an HTTPS source or paste checksum strings. Custom administrator sources remain under Advanced.
+The shared interface provides official downloads, recovery preparation, change preview, reset and cancellation. Ordinary users do not need a custom HTTPS server or manually entered checksum. Cairo software rendering avoids missing virtual-GPU driver problems without changing system graphics settings.
 
-Official ISO downloads run without administrator privileges or a second disk. Select distribution, release, edition, architecture and a download folder. Addresses and checksums come from official metadata; Fedora prereleases are excluded.
+## Download and recover
+
+Downloading an ISO needs neither root nor a second disk and never schedules a reset. URLs and checksums come from official HTTPS metadata, with progress, speed and cancellation. Fedora Beta is excluded from stable selection.
 
 ```sh
-linux-factory-reset catalog
-linux-factory-reset resolve --distro fedora --release stable --edition workstation --arch arm64
-linux-factory-reset download --distro debian --release stable --edition netinst --arch arm64 --directory ~/Downloads
+linux-factory-reset download --distro ubuntu --release 26.04 --edition desktop --arch arm64 --directory ~/Downloads
+linux-factory-reset resolve --distro fedora --release stable --edition workstation --arch amd64
 ```
 
-Ubuntu: `--release 24.04|26.04`, `--edition desktop|server`. Fedora: `--release stable`, `--edition workstation|server`. If the official site lacks a selected combination, the tool stops with an explanation instead of using a third-party source. Optional explicit proxy: `--proxy http://127.0.0.1:7890`; user proxy environment variables also work.
+Ubuntu editions are `desktop`/`server`, Fedora `workstation`/`server`, Debian `netinst`. Unavailable combinations fail explicitly. An optional loopback proxy can be supplied with `--proxy http://127.0.0.1:7890`.
 
-## Experimental recovery preparation
-
-Provide a separate mounted **ext4 recovery partition**. The application does not partition or format disks. In a VM, add a second virtual disk first. Any subdirectory on that recovery partition can be selected; the actual mountpoint is detected, and files are placed under its compatibility `ubuntu-reset/` directory. A folder on the running system filesystem is not a recovery partition.
+Recovery needs another mounted **ext4 recovery disk**, with space for the pristine image, staging and a temporary old-system rollback copy. The application does not automatically partition or format disks. Add a second virtual disk for VM evaluation; any directory on its mounted filesystem can be selected.
 
 ```sh
-sudo linux-factory-reset prepare-image --file /path/to/pristine-system.img --storage /mnt/recovery/folder
+linux-factory-reset sources
+sudo linux-factory-reset prepare-auto --storage /mnt/recovery
+# Or: sudo linux-factory-reset prepare-image --file /path/to/pristine.img --storage /mnt/recovery
 sudo linux-factory-reset plan
-```
-
-An imported image must contain a pristine installed system of the same distribution, CPU architecture and boot layout, with exactly one ext4 system partition and one FAT boot partition, and no existing personal accounts. Installer/live ISOs, incremental QCOW2 and encrypted disks are not installed-system references. Local files are snapshotted privately and parsed read-only; a computed file hash does not authenticate its publisher.
-
-Automatic preparation appears only when a built-in source matches the detected system. The development branch integrates official Debian 13 NoCloud images for generic AMD64/ARM64 UEFI, using official HTTPS SHA-512 checksums, plus signed Ubuntu 26.04 native Pi images. Downloads run with visible progress/speed/cancellation as the ordinary desktop user; the privileged importer checks the snapshot against the expected digest again.
-
-**The Debian automatic source is a base system without a desktop, with a new administrator created at the local console. It is not a historical copy of the original desktop package set or configuration.** Generic Ubuntu UEFI and Debian 12 still need local installed-system images or administrator-produced profiles. Consult the acceptance record for the release tag being used. **Downloading an official ISO is separate from preparing a usable recovery source.**
-
-Previewing changes requires prepared recovery data. Missing state now gives setup guidance; actual backend errors are displayed and can be copied. Preparation/comparison shows a busy dialog.
-
-```sh
 sudo linux-factory-reset arm --confirm ERASE-ALL-USERS --reboot
-# Cancel before reboot:
-sudo linux-factory-reset cancel
+# Cancel before reboot: sudo linux-factory-reset cancel
 ```
 
-Restore runs offline in initramfs and overwrites the root and boot filesystems, deleting old users, personal files, additional software and configuration. Keep recovery media connected. It is neither a power-loss transaction nor a secure disk wipe. Btrfs, LVM, encryption, RAID, separate `/home` or `/boot` and additional system partitions are unsupported. A new administrator is created at first boot. Downloads/previews do not arm reset, reboot or change BIOS settings.
+Preparation, downloads and previews do not perform restoration. Once armed, the next boot restores system/boot files offline and removes all old personal users, data, extra software and configuration. Keep the recovery disk connected. BootOrder is temporarily adjusted; BIOS defaults are not reset and Secure Boot is not disabled automatically. A new administrator is created locally, with root locked.
 
-## Graphics compatibility and upgrades
+Successful reset deletes temporary rollback data and the host-generated rescue initramfs. Successful rollback intentionally restores old accounts and files. This is not A/B boot management, secure erasure or a transaction guarantee against damaged hardware and every post-reset driver failure. Native Ubuntu Pi boot retains its earlier flow without this UEFI rollback protocol. See the [recovery protocol](docs/recovery.md) and [profile guide](docs/profiles.md).
 
-The GUI defaults to Cairo/software rendering for VMs without working EGL/Zink drivers. It changes only its own process environment and preserves explicit user overrides.
+ISO downloads use official HTTPS SHA-256 metadata. Debian recovery uses SHA-512; native Ubuntu Pi additionally verifies OpenPGP. Generic Ubuntu cloud and Fedora recovery currently use official HTTPS SHA-256 without detached PGP verification. Fedora conversion runs the trusted source's dracut as root; never select untrusted system images.
 
-```sh
-GSK_RENDERER=cairo LIBGL_ALWAYS_SOFTWARE=1 linux-factory-reset gui
-```
-
-Legacy state directories, initramfs hook names and recovery-directory names are retained to avoid multiple incompatible reset markers. The new DEB replaces the old package. Upgrading does not prepare or arm recovery.
-
-## Build and validation
+## Build and validate
 
 ```sh
 sudo apt install build-essential cmake libssl-dev libcurl4-openssl-dev nlohmann-json3-dev rsync squashfs-tools
@@ -86,4 +68,4 @@ cmake --build build -j2
 ctest --test-dir build --output-on-failure
 ```
 
-[CI](.github/workflows/ci.yml) uses temporary directories, synthetic system trees, a local HTTPS fixture inside disposable containers, and a virtual display without a GPU. A successful build or directory fixture does not establish bootable real-machine recovery. See [validation](docs/validation.md) and [recovery protocol](docs/recovery.md).
+Heavy builds, large images and actual restoration tests run on disposable remote runners, not the user's Raspberry Pi. CI covers native architectures, package installation, HTTPS download/cancellation, GPU-free GUI and directory fixtures. Disposable UEFI VMs separately exercise boot, account/data removal, a usable sudo administrator and rollback. Successful ARM64 source conversion does not establish ARM guest boot or physical-hardware compatibility.

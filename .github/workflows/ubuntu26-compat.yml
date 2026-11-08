@@ -1,0 +1,37 @@
+name: Verify published Ubuntu build on Ubuntu 26.04
+on:
+  workflow_dispatch:
+    inputs:
+      ci_run:
+        description: Exact successful Build and test run containing release candidates
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  abi:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    container: ubuntu:26.04
+    steps:
+      - run: apt-get update && apt-get install -y --no-install-recommends ca-certificates
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-factory-reset-ubuntu24.04-${{ matrix.runner }}
+          run-id: ${{ inputs.ci_run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: candidates
+      - name: Verify exact artifacts and install without arming a reset
+        run: |
+          cd candidates
+          sha256sum -c SHA256SUMS-*
+          apt-get install -y --no-install-recommends ./*.deb
+          linux-factory-reset --version
+          linux-factory-reset gui --preview
+          chmod +x linux-factory-reset-ubuntu24.04-linux-*
+          ./linux-factory-reset-ubuntu24.04-linux-* --version
+          test ! -e /var/lib/ubuntu-reset/request
