@@ -13,7 +13,7 @@ while (Date.now() < deadline) {
   if (fault === 'none' && armedAt && !log.includes('LFR_VM_AWAITING_NEW_USER') && Date.now() - armedAt > 180000) throw Error('Recovery did not reach initial account setup within 3 minutes; inspect serial evidence');
   if (setupAt && !log.includes('LFR_VM_RESTORE_PASS') && Date.now() - setupAt > 190000) throw Error('Initial account setup did not complete; inspect serial evidence');
   if (/ALERT!.*does not exist|Ubuntu Reset STOPPED|Kernel panic - not syncing|grub rescue>|Entering emergency mode|No bootable device/.test(log)) throw Error('Guest boot/recovery halted; inspect serial evidence');
-  if (/LFR_VM_(?:PREPARATION_FAIL|OLD_DATA_SURVIVED|NEW_USER_FAIL|SETUP_TIMEOUT)/.test(log)) throw Error('Real VM reported a failed recovery; inspect serial evidence');
+  if (/LFR_VM_(?:PREPARATION_FAIL|OLD_DATA_SURVIVED|NEW_USER_FAIL|SETUP_TIMEOUT|SELINUX_FAIL)/.test(log)) throw Error('Real VM reported a failed recovery; inspect serial evidence');
   if (typed && log.includes('reboot: Power down')) { console.log('Guest powered off; the host must verify its synced result and restored filesystem.'); process.exit(0); }
   if (log.includes('LFR_VM_RESTORE_PASS')) { await delay(5000); console.log('Real UEFI VM restored, removed old users/data and created a new sudo administrator.'); process.exit(0); }
   if (!typed && log.includes('LFR_VM_AWAITING_NEW_USER')) {

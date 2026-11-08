@@ -106,14 +106,18 @@ exec > >(tee /dev/ttyS0) 2>&1
 if getent passwd lfr_old_user || test -e /home/lfr_old_user || test -e /root/lfr-private || test -e /opt/lfr-extra/unwanted; then
     echo LFR_VM_OLD_DATA_SURVIVED; systemctl --no-block poweroff; exit 1
 fi
-systemd-run --unit=lfr-qa-observer --property=StandardOutput=tty --property=TTYPath=/dev/ttyS0 /bin/bash -c '
+observer_context=()
+if [[ -e /etc/fedora-release ]]; then observer_context=(--property=SELinuxContext=system_u:system_r:initrc_t:s0); fi
+systemd-run "${observer_context[@]}" --unit=lfr-qa-observer --property=StandardOutput=tty --property=TTYPath=/dev/ttyS0 /bin/bash -c '
     for ((i=0;i<180;i++)); do
         if test -f /var/lib/ubuntu-reset-firstboot-complete; then
+            if test -e /etc/fedora-release && test "$(getenforce)" != Enforcing; then echo LFR_VM_SELINUX_FAIL; systemctl --no-block poweroff; exit 1; fi
             if getent passwd lfrqatest && id -nG lfrqatest | grep -Eq "(^| )(sudo|wheel)( |$)" && passwd -S root | grep -q " L " && printf "%s\n" qa7reset92factory | runuser -u lfrqatest -- sudo -S -k -p "" /usr/bin/id -u | grep -qx 0; then echo PASS >/var/lib/lfr-qa-result; sync; echo LFR_VM_RESTORE_PASS; else echo FAIL >/var/lib/lfr-qa-result; sync; echo LFR_VM_NEW_USER_FAIL; fi
             systemctl --no-block poweroff; exit
         fi
         sleep 1
     done
+    journalctl -b -u ubuntu-reset-firstboot.service --no-pager
     echo LFR_VM_SETUP_TIMEOUT; systemctl --no-block poweroff; exit 1'
 echo LFR_VM_AWAITING_NEW_USER
 OBSERVER
