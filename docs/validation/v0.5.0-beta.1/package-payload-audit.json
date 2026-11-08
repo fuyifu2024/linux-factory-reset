@@ -1,0 +1,490 @@
+[
+  {
+    "package": "linux-factory-reset_0.5.0-beta.1_debian12_amd64.deb",
+    "elf": {
+      "machine": 62,
+      ".text": "ef002376857f6e99d8ff5c8e7393eb89bfe5cb0f7bfe3f88e02cebc3e2e0e609",
+      ".rodata": "6cbdaedcd7bfb1be986228aad069fb0c97f599f77bd71d77c3bbfc664b098f84"
+    },
+    "scripts": [
+      {
+        "path": "usr/lib/ubuntu-reset/restore.sh",
+        "source": "boot/restore.sh",
+        "sha256": "7aac8a02e207ea3d69a56013a7d102369074c54990e4794a96af40ce92143d1d",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/reconcile.sh",
+        "source": "boot/reconcile.sh",
+        "sha256": "4fd4173e62c09380af0484a7e85422af085524dbcbbec80597bda41ffc56a3e8",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/relocate.sh",
+        "source": "boot/relocate.sh",
+        "sha256": "f0e5892ee7e8392dec26b0e7df277df0d6461b72e7be5c0807b8fdf037b5923e",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/firstboot.sh",
+        "source": "firstboot/firstboot.sh",
+        "sha256": "96385777e8390e801acae01cf97032db9af7073e320612207c7234eecc9138ef",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/ubuntu-reset-firstboot.service",
+        "source": "firstboot/ubuntu-reset-firstboot.service",
+        "sha256": "d7f9a5908e4e30bb2f5e5eb7f46f71fa898291c0cf68342ed34f361c20dcfd75",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/module-setup.sh",
+        "source": "boot/dracut/module-setup.sh",
+        "sha256": "9bdadf8286db1f0bb334ff53a0c867e7ce4fe113fa480a421f32e51c9c4234c0",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/pre-pivot.sh",
+        "source": "boot/dracut/pre-pivot.sh",
+        "sha256": "486c353465bac57c668c33f467f24bd0dc556447088e3dd31aab0def3302405c",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "etc/initramfs-tools/hooks/ubuntu-reset",
+        "source": "boot/hook",
+        "sha256": "c242e3bd8853709ffdd8203ff012464f9f3efa005152be54cadeeffb2404f965",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "etc/initramfs-tools/scripts/local-bottom/ubuntu-reset",
+        "source": "boot/local-bottom",
+        "sha256": "20e282a745f9ee03e7f275dd0980bbb3d55800d67bd9b40d1f73740efe6f8823",
+        "rpm_shebang_remap": false
+      }
+    ]
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.1_debian12_arm64.deb",
+    "elf": {
+      "machine": 183,
+      ".text": "26be1835a43bdb1a1638c3e67f489e20c8c9ddfe0909d34d556f453411249d2e",
+      ".rodata": "5c41ad592bc87abd5ce3bf36995712b2db4df4a295d970d1034a41abfea54158"
+    },
+    "scripts": [
+      {
+        "path": "usr/lib/ubuntu-reset/restore.sh",
+        "source": "boot/restore.sh",
+        "sha256": "7aac8a02e207ea3d69a56013a7d102369074c54990e4794a96af40ce92143d1d",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/reconcile.sh",
+        "source": "boot/reconcile.sh",
+        "sha256": "4fd4173e62c09380af0484a7e85422af085524dbcbbec80597bda41ffc56a3e8",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/relocate.sh",
+        "source": "boot/relocate.sh",
+        "sha256": "f0e5892ee7e8392dec26b0e7df277df0d6461b72e7be5c0807b8fdf037b5923e",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/firstboot.sh",
+        "source": "firstboot/firstboot.sh",
+        "sha256": "96385777e8390e801acae01cf97032db9af7073e320612207c7234eecc9138ef",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/ubuntu-reset-firstboot.service",
+        "source": "firstboot/ubuntu-reset-firstboot.service",
+        "sha256": "d7f9a5908e4e30bb2f5e5eb7f46f71fa898291c0cf68342ed34f361c20dcfd75",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/module-setup.sh",
+        "source": "boot/dracut/module-setup.sh",
+        "sha256": "9bdadf8286db1f0bb334ff53a0c867e7ce4fe113fa480a421f32e51c9c4234c0",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/pre-pivot.sh",
+        "source": "boot/dracut/pre-pivot.sh",
+        "sha256": "486c353465bac57c668c33f467f24bd0dc556447088e3dd31aab0def3302405c",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "etc/initramfs-tools/hooks/ubuntu-reset",
+        "source": "boot/hook",
+        "sha256": "c242e3bd8853709ffdd8203ff012464f9f3efa005152be54cadeeffb2404f965",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "etc/initramfs-tools/scripts/local-bottom/ubuntu-reset",
+        "source": "boot/local-bottom",
+        "sha256": "20e282a745f9ee03e7f275dd0980bbb3d55800d67bd9b40d1f73740efe6f8823",
+        "rpm_shebang_remap": false
+      }
+    ]
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.1_debian13_amd64.deb",
+    "elf": {
+      "machine": 62,
+      ".text": "c7a2ade9bf19d423752ba6727ce8fcc5ae0950333788b44a5d5eb2ac30f6f9db",
+      ".rodata": "6fa13eb960cb1fea17c5be2a4dae99a21c36ea0161ea63881cc9ba48fe8374d1"
+    },
+    "scripts": [
+      {
+        "path": "usr/lib/ubuntu-reset/restore.sh",
+        "source": "boot/restore.sh",
+        "sha256": "7aac8a02e207ea3d69a56013a7d102369074c54990e4794a96af40ce92143d1d",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/reconcile.sh",
+        "source": "boot/reconcile.sh",
+        "sha256": "4fd4173e62c09380af0484a7e85422af085524dbcbbec80597bda41ffc56a3e8",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/relocate.sh",
+        "source": "boot/relocate.sh",
+        "sha256": "f0e5892ee7e8392dec26b0e7df277df0d6461b72e7be5c0807b8fdf037b5923e",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/firstboot.sh",
+        "source": "firstboot/firstboot.sh",
+        "sha256": "96385777e8390e801acae01cf97032db9af7073e320612207c7234eecc9138ef",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/ubuntu-reset-firstboot.service",
+        "source": "firstboot/ubuntu-reset-firstboot.service",
+        "sha256": "d7f9a5908e4e30bb2f5e5eb7f46f71fa898291c0cf68342ed34f361c20dcfd75",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/module-setup.sh",
+        "source": "boot/dracut/module-setup.sh",
+        "sha256": "9bdadf8286db1f0bb334ff53a0c867e7ce4fe113fa480a421f32e51c9c4234c0",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/pre-pivot.sh",
+        "source": "boot/dracut/pre-pivot.sh",
+        "sha256": "486c353465bac57c668c33f467f24bd0dc556447088e3dd31aab0def3302405c",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "etc/initramfs-tools/hooks/ubuntu-reset",
+        "source": "boot/hook",
+        "sha256": "c242e3bd8853709ffdd8203ff012464f9f3efa005152be54cadeeffb2404f965",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "etc/initramfs-tools/scripts/local-bottom/ubuntu-reset",
+        "source": "boot/local-bottom",
+        "sha256": "20e282a745f9ee03e7f275dd0980bbb3d55800d67bd9b40d1f73740efe6f8823",
+        "rpm_shebang_remap": false
+      }
+    ]
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.1_debian13_arm64.deb",
+    "elf": {
+      "machine": 183,
+      ".text": "50375e87e1311e355be42194b7523092b3e59a41ced6f621ffab379172ecf933",
+      ".rodata": "ee3583b4e49dccc4c8c1e46980c4d9dd85fd388af3ea1910f7a627325292af6e"
+    },
+    "scripts": [
+      {
+        "path": "usr/lib/ubuntu-reset/restore.sh",
+        "source": "boot/restore.sh",
+        "sha256": "7aac8a02e207ea3d69a56013a7d102369074c54990e4794a96af40ce92143d1d",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/reconcile.sh",
+        "source": "boot/reconcile.sh",
+        "sha256": "4fd4173e62c09380af0484a7e85422af085524dbcbbec80597bda41ffc56a3e8",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/relocate.sh",
+        "source": "boot/relocate.sh",
+        "sha256": "f0e5892ee7e8392dec26b0e7df277df0d6461b72e7be5c0807b8fdf037b5923e",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/firstboot.sh",
+        "source": "firstboot/firstboot.sh",
+        "sha256": "96385777e8390e801acae01cf97032db9af7073e320612207c7234eecc9138ef",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/ubuntu-reset-firstboot.service",
+        "source": "firstboot/ubuntu-reset-firstboot.service",
+        "sha256": "d7f9a5908e4e30bb2f5e5eb7f46f71fa898291c0cf68342ed34f361c20dcfd75",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/module-setup.sh",
+        "source": "boot/dracut/module-setup.sh",
+        "sha256": "9bdadf8286db1f0bb334ff53a0c867e7ce4fe113fa480a421f32e51c9c4234c0",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/pre-pivot.sh",
+        "source": "boot/dracut/pre-pivot.sh",
+        "sha256": "486c353465bac57c668c33f467f24bd0dc556447088e3dd31aab0def3302405c",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "etc/initramfs-tools/hooks/ubuntu-reset",
+        "source": "boot/hook",
+        "sha256": "c242e3bd8853709ffdd8203ff012464f9f3efa005152be54cadeeffb2404f965",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "etc/initramfs-tools/scripts/local-bottom/ubuntu-reset",
+        "source": "boot/local-bottom",
+        "sha256": "20e282a745f9ee03e7f275dd0980bbb3d55800d67bd9b40d1f73740efe6f8823",
+        "rpm_shebang_remap": false
+      }
+    ]
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.1_fedora45_aarch64.rpm",
+    "elf": {
+      "machine": 183,
+      ".text": "a673aee6320750f5ae13d12ab9e5cd6d9cd876f77d9f0290b28921689ced2aff",
+      ".rodata": "6c62b5dc0f066b15a59be521d8e4a80ac1efb862569b462282f085f12f5a25cb"
+    },
+    "scripts": [
+      {
+        "path": "usr/lib/ubuntu-reset/restore.sh",
+        "source": "boot/restore.sh",
+        "sha256": "26583d38b1553142cd3b2a6dc8a3eb0fc0240d7f39d5748297f8b5976f887cc6",
+        "rpm_shebang_remap": true
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/reconcile.sh",
+        "source": "boot/reconcile.sh",
+        "sha256": "4fd4173e62c09380af0484a7e85422af085524dbcbbec80597bda41ffc56a3e8",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/relocate.sh",
+        "source": "boot/relocate.sh",
+        "sha256": "f0e5892ee7e8392dec26b0e7df277df0d6461b72e7be5c0807b8fdf037b5923e",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/firstboot.sh",
+        "source": "firstboot/firstboot.sh",
+        "sha256": "a6156bcc631c2eb644516e4534670668ab25e320e631b4b175ce3ab646006208",
+        "rpm_shebang_remap": true
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/ubuntu-reset-firstboot.service",
+        "source": "firstboot/ubuntu-reset-firstboot.service",
+        "sha256": "d7f9a5908e4e30bb2f5e5eb7f46f71fa898291c0cf68342ed34f361c20dcfd75",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/module-setup.sh",
+        "source": "boot/dracut/module-setup.sh",
+        "sha256": "564a5c26feb3025bd4ab3a13e8a6e3dacec86961f577eb189c4d102e8ef4fedb",
+        "rpm_shebang_remap": true
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/pre-pivot.sh",
+        "source": "boot/dracut/pre-pivot.sh",
+        "sha256": "9ab5b1a269b212fb7856a76ad89333aa07b376d336a27f3b4a2789d07c798fce",
+        "rpm_shebang_remap": true
+      }
+    ]
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.1_fedora45_x86_64.rpm",
+    "elf": {
+      "machine": 62,
+      ".rodata": "82b429dba2bc095f5c095f87785395d65d5f935e1d303e164d1976998ede9c7d",
+      ".text": "93b709fec4a0ea7557fcc2b8fc8d9491918a34cc7d90767d493834ac18a8563b"
+    },
+    "scripts": [
+      {
+        "path": "usr/lib/ubuntu-reset/restore.sh",
+        "source": "boot/restore.sh",
+        "sha256": "26583d38b1553142cd3b2a6dc8a3eb0fc0240d7f39d5748297f8b5976f887cc6",
+        "rpm_shebang_remap": true
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/reconcile.sh",
+        "source": "boot/reconcile.sh",
+        "sha256": "4fd4173e62c09380af0484a7e85422af085524dbcbbec80597bda41ffc56a3e8",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/relocate.sh",
+        "source": "boot/relocate.sh",
+        "sha256": "f0e5892ee7e8392dec26b0e7df277df0d6461b72e7be5c0807b8fdf037b5923e",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/firstboot.sh",
+        "source": "firstboot/firstboot.sh",
+        "sha256": "a6156bcc631c2eb644516e4534670668ab25e320e631b4b175ce3ab646006208",
+        "rpm_shebang_remap": true
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/ubuntu-reset-firstboot.service",
+        "source": "firstboot/ubuntu-reset-firstboot.service",
+        "sha256": "d7f9a5908e4e30bb2f5e5eb7f46f71fa898291c0cf68342ed34f361c20dcfd75",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/module-setup.sh",
+        "source": "boot/dracut/module-setup.sh",
+        "sha256": "564a5c26feb3025bd4ab3a13e8a6e3dacec86961f577eb189c4d102e8ef4fedb",
+        "rpm_shebang_remap": true
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/pre-pivot.sh",
+        "source": "boot/dracut/pre-pivot.sh",
+        "sha256": "9ab5b1a269b212fb7856a76ad89333aa07b376d336a27f3b4a2789d07c798fce",
+        "rpm_shebang_remap": true
+      }
+    ]
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.1_ubuntu24.04_amd64.deb",
+    "elf": {
+      "machine": 62,
+      ".text": "cdc1e319d844d2ed5984abda9364bb9bd0b11e3fa9997554dcec69b00edf2735",
+      ".rodata": "b01f8df7822bd048e19ca0c12f8c26a0a9a342fbd6f866632ae1491c81f09ef0"
+    },
+    "scripts": [
+      {
+        "path": "usr/lib/ubuntu-reset/restore.sh",
+        "source": "boot/restore.sh",
+        "sha256": "7aac8a02e207ea3d69a56013a7d102369074c54990e4794a96af40ce92143d1d",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/reconcile.sh",
+        "source": "boot/reconcile.sh",
+        "sha256": "4fd4173e62c09380af0484a7e85422af085524dbcbbec80597bda41ffc56a3e8",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/relocate.sh",
+        "source": "boot/relocate.sh",
+        "sha256": "f0e5892ee7e8392dec26b0e7df277df0d6461b72e7be5c0807b8fdf037b5923e",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/firstboot.sh",
+        "source": "firstboot/firstboot.sh",
+        "sha256": "96385777e8390e801acae01cf97032db9af7073e320612207c7234eecc9138ef",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/ubuntu-reset-firstboot.service",
+        "source": "firstboot/ubuntu-reset-firstboot.service",
+        "sha256": "d7f9a5908e4e30bb2f5e5eb7f46f71fa898291c0cf68342ed34f361c20dcfd75",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/module-setup.sh",
+        "source": "boot/dracut/module-setup.sh",
+        "sha256": "9bdadf8286db1f0bb334ff53a0c867e7ce4fe113fa480a421f32e51c9c4234c0",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/pre-pivot.sh",
+        "source": "boot/dracut/pre-pivot.sh",
+        "sha256": "486c353465bac57c668c33f467f24bd0dc556447088e3dd31aab0def3302405c",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "etc/initramfs-tools/hooks/ubuntu-reset",
+        "source": "boot/hook",
+        "sha256": "c242e3bd8853709ffdd8203ff012464f9f3efa005152be54cadeeffb2404f965",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "etc/initramfs-tools/scripts/local-bottom/ubuntu-reset",
+        "source": "boot/local-bottom",
+        "sha256": "20e282a745f9ee03e7f275dd0980bbb3d55800d67bd9b40d1f73740efe6f8823",
+        "rpm_shebang_remap": false
+      }
+    ]
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.1_ubuntu24.04_arm64.deb",
+    "elf": {
+      "machine": 183,
+      ".text": "bb4479876353ff47e0aa0d19c2033f2fc71881b989c7086d31e1f817a3efdb2b",
+      ".rodata": "a01546a0384ed224ce7da7b7d032f56f7fd585074a3f97e412a06f401baea090"
+    },
+    "scripts": [
+      {
+        "path": "usr/lib/ubuntu-reset/restore.sh",
+        "source": "boot/restore.sh",
+        "sha256": "7aac8a02e207ea3d69a56013a7d102369074c54990e4794a96af40ce92143d1d",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/reconcile.sh",
+        "source": "boot/reconcile.sh",
+        "sha256": "4fd4173e62c09380af0484a7e85422af085524dbcbbec80597bda41ffc56a3e8",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/relocate.sh",
+        "source": "boot/relocate.sh",
+        "sha256": "f0e5892ee7e8392dec26b0e7df277df0d6461b72e7be5c0807b8fdf037b5923e",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/firstboot.sh",
+        "source": "firstboot/firstboot.sh",
+        "sha256": "96385777e8390e801acae01cf97032db9af7073e320612207c7234eecc9138ef",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/ubuntu-reset/ubuntu-reset-firstboot.service",
+        "source": "firstboot/ubuntu-reset-firstboot.service",
+        "sha256": "d7f9a5908e4e30bb2f5e5eb7f46f71fa898291c0cf68342ed34f361c20dcfd75",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/module-setup.sh",
+        "source": "boot/dracut/module-setup.sh",
+        "sha256": "9bdadf8286db1f0bb334ff53a0c867e7ce4fe113fa480a421f32e51c9c4234c0",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "usr/lib/dracut/modules.d/95linux-factory-reset/pre-pivot.sh",
+        "source": "boot/dracut/pre-pivot.sh",
+        "sha256": "486c353465bac57c668c33f467f24bd0dc556447088e3dd31aab0def3302405c",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "etc/initramfs-tools/hooks/ubuntu-reset",
+        "source": "boot/hook",
+        "sha256": "c242e3bd8853709ffdd8203ff012464f9f3efa005152be54cadeeffb2404f965",
+        "rpm_shebang_remap": false
+      },
+      {
+        "path": "etc/initramfs-tools/scripts/local-bottom/ubuntu-reset",
+        "source": "boot/local-bottom",
+        "sha256": "20e282a745f9ee03e7f275dd0980bbb3d55800d67bd9b40d1f73740efe6f8823",
+        "rpm_shebang_remap": false
+      }
+    ]
+  }
+]
