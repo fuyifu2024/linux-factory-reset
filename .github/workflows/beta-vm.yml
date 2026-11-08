@@ -64,12 +64,14 @@ jobs:
       - name: First running checkpoint
         run: for i in $(seq 1 18); do test ! -f evidence/test-exit || break; sleep 10; done
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: progress-1-${{ inputs.distro }}-${{ inputs.arch }}-${{ inputs.fault }}
           path: evidence/
       - name: Second running checkpoint
         run: for i in $(seq 1 18); do test ! -f evidence/test-exit || break; sleep 10; done
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: progress-2-${{ inputs.distro }}-${{ inputs.arch }}-${{ inputs.fault }}
           path: evidence/
@@ -85,6 +87,9 @@ jobs:
           done
           echo 'Acceptance did not complete; inspect running checkpoints and final evidence.'
           exit 1
+      - name: Make disposable QA evidence readable for upload
+        if: always()
+        run: sudo chmod -R a+rX evidence
       - uses: actions/upload-artifact@v4
         if: always()
         with:
