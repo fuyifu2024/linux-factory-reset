@@ -1,34 +1,34 @@
-# 恢复设计及边界
+# 恢复与回退 / Recovery and rollback
 
-## 生命周期
+## 中文
 
-`未准备 → 已验签的原始源 → 本地只读资料 → 已验证目标 → 重建 initramfs → 待恢复标记 → 下次启动离线校验 → root/boot 恢复 → UUID 定位 → 清理标记 → 重启`
+当前开发版在 C++20 主程序外保留少量离线 Shell。目标系统要求普通 ext4 根分区、单独 FAT ESP、标准 GRUB 和可写 UEFI 启动变量；原生 Ubuntu Pi 引导走原有适配器。LVM、加密、RAID、Btrfs 目标、独立 `/boot`、独立 `/home` 尚不支持。Fedora 的 Btrfs **来源镜像**会在私有暂存区转换为平铺 ext4 恢复资料，这不表示可以直接重置已安装的 Btrfs 系统。
 
-当前系统的个人目录不作为恢复来源。仅根据包名清单删除文件无法恢复被修改的配置、丢失的文件及包外生成状态，因此恢复资料保留原始字节。Squashfs 提供压缩只读文件树；rsync 使用内容校验和跳过相同文件的数据写入。完整哈希与逐文件比较仍需读取较多数据，不保证比全新安装更快，也没有发布耗时基准。
+通用 UEFI 恢复顺序：
 
-## 身份与存储
+1. 从官网 HTTPS 元数据选择本机发行版、版本和架构；下载、进度、速度、取消和校验沿用统一界面。也可选可信本地镜像。
+2. 在另一块 ext4 恢复盘制作压缩、只读的初始系统资料。清除源中的机器身份、root 个人资料及 root 密码；拒绝含个人用户的来源。云端初始化被禁用，首次开机创建本地管理员。
+3. 完整检查资料与目标身份，生成发行版对应的 initramfs。Debian/Ubuntu 使用 initramfs-tools；Fedora 使用 dracut。
+4. 将当前内核、恢复 initramfs 复制到恢复盘，生成独立 GRUB EFI 救援程序。记录原 BootOrder，设置临时救援入口优先启动。这里操作的是启动项，不是恢复 BIOS 默认值；不会关闭 Secure Boot。当前独立入口要求 Secure Boot 已关闭，否则拒绝授权恢复。
+5. 在 initramfs 中离线核对三个不同 UUID、设备类型、资料哈希和空间；在恢复盘保存临时 root/ESP 回退副本，完成并同步后才进入 `WRITING` 阶段。
+6. 通过 rsync 校验内容并恢复 root、ESP，定位 UUID。独立救援 EFI 目录不参与覆盖或删除。写入错误触发回退；`WRITING` 阶段断电后，独立入口使用保留的内核/initramfs，再次启动时回退。
+7. 两部分文件及引导指针同步完成后，持久化 `COMMITTED` 决定，删除临时个人数据副本，再清除激活标记、恢复原 BootOrder、删除临时启动项。此阶段中断会继续清理，不使用已部分删除的回退副本。
+8. 重启进入初始用户设置。Debian/Ubuntu 新用户进入 sudo 组；Fedora 进入 wheel 组，保持 root 锁定，并通过正常 SELinux 自动重新标记处理新增文件。
 
-- 恢复分区、根分区、FAT 启动分区必须是三个不同 UUID。
-- 恢复源和目标通过 UUID 定位；重复 UUID 在启动时拒绝继续。
-- 状态、启动配置及待恢复标记仅由管理员写入；启动标记要求 root 所有及 0600 权限。
-- 只在 `/root` 是记录的目标设备、没有子挂载、恢复源 SHA-256 完全匹配后才允许修改目标。
-- root、firmware/ESP 分别恢复，保持分区表和文件系统 UUID，不通过 mkfs/分区命令清除磁盘。
-- 单独的 BIOS 操作只使用内核文档中的 `reset_bios` / `factory` 接口，不泛化到其他 sysfs 节点。
+重启前可运行 `sudo linux-factory-reset cancel`。取消不依赖恢复镜像仍然完好，但要求原恢复盘仍挂载、ESP 身份未改变；已经进入写入阶段时，应使用独立救援入口。救援菜单提供继续恢复与回退选项。回退成功后原账号和文件会回到原系统；正常重置成功后，不保留这份临时个人资料副本。
 
-## 失败边界
+这些机制需要实际 VM/硬件证据验证，不能凭编译通过宣布可用。具体版本的实测范围见验收记录。它们不能保证故障硬盘、损坏的 ESP/分区表、丢失的恢复盘、所有固件行为或恢复后任意驱动故障均可回退。不是 A/B 系统，也不是磁盘安全擦除；只恢复文件后尚未证明系统可启动。原生 Pi 适配器暂未增加独立 UEFI 入口和此回退协议。
 
-下载使用 `.part` 临时文件；完整下载和 SHA-256 校验成功才更名。中断后可重新下载，首版不做断点续传。资料可能较大，使用足够空间的恢复分区。
+## English
 
-待恢复标记最后写入。下载/构建/校验失败不会设置它。initramfs 中发现缺少恢复介质、校验错误、目标不一致或容量不足，会进入救援提示。待恢复标记在 root 文件还原期间受到保护，成功完成两部分还原后才移除。
+Generic UEFI targets currently require a plain ext4 root, separate FAT ESP, standard GRUB and writable UEFI boot variables. LVM, encryption, RAID, Btrfs targets, separate `/boot` and separate `/home` remain unsupported. Fedora Btrfs **source images** are flattened in private staging; this does not enable resetting an installed Btrfs target.
 
-**root 与 FAT 启动分区的修改并不原子化。** 断电和硬件 I/O 故障可能使现有引导无法加载恢复脚本。没有 A/B 系统分区、事务回滚或自动安全擦除承诺。必须保留可用的外部救援启动介质。首版尚无真实硬件端到端测试证据。
+The application verifies the official source and all target identities, builds the distro's recovery initramfs, and copies the kernel/initramfs onto a separate ext4 recovery disk. An independent GRUB EFI loader temporarily takes priority in BootOrder. Firmware defaults are not reset, and Secure Boot is never disabled automatically; the unsigned independent loader requires it already disabled.
 
-在尚未恢复时，正常系统中执行 `sudo ubuntu-reset cancel` 可取消。若已停留在 initramfs，请先核对屏幕错误；不要直接退出救援 shell 强行启动。
+Before modifying the offline target, recovery saves and syncs a temporary root/ESP rollback copy. A durable `WRITING` journal precedes changes. Write failure triggers rollback; interruption during that phase boots the independent copy and rolls back without relying on the partially replaced target's `/boot` or `/usr`. The rescue directory on the ESP is excluded from reconciliation.
 
-需要放弃待执行操作时，可从**外部救援系统**按实际 UUID 将目标根分区挂载到 `/mnt/target`，确认这是正确目标后删除 `/mnt/target/var/lib/ubuntu-reset/request`。这只取消触发，不修复已经被部分替换的内容。部分恢复后通常需要重新准备可信恢复源并从独立救援环境恢复，或重新部署系统。
+After root, ESP and relocated boot pointers are synced, `COMMITTED` is recorded. Temporary personal backups are deleted before normal boot is re-enabled. Interrupted committed cleanup resumes cleanup rather than using a partially deleted backup. The original BootOrder is restored and the temporary entry removed. A successful reset removes all old accounts/data and creates a new sudo/wheel administrator with root locked. Fedora retains SELinux and requests normal relabeling.
 
-## 审计建议
+Use `sudo linux-factory-reset cancel` before reboot. Cancellation does not need an undamaged source image, but needs the original mounted recovery disk and unchanged ESP identity. Once writing starts, use the independent rescue entry. Successful rollback intentionally restores the old accounts and files; successful reset deletes the temporary personal backup.
 
-代码中没有接受任意命令的 root 后门、自动下载并运行脚本、EFI 变量清空或泛化的 `rm -rf /`。执行外部程序使用 argv 数组。主要路径为：`src/system.cpp` 准备与授权、`boot/local-bottom` 离线检查、`boot/reconcile.sh` 文件恢复、`boot/relocate.sh` 按 Debian/Ubuntu 和 ARM64/x86_64 定位引导指针。
-
-安装时 hook 处于休眠状态，没有 boot.conf 时不会加入执行资料。本包没有执行 update-initramfs、设置标记或重启的安装脚本；安装发行版依赖可能触发其正常维护操作。删除包前应先取消待恢复操作；已经生成的 initramfs 仍可能含旧脚本，需要按 Debian/Ubuntu 管理方式更新 initramfs 才彻底移除。
+Consult the release's acceptance evidence. This is not A/B boot management, secure erasure, or a guarantee against damaged media/ESP/partition tables, missing recovery storage, arbitrary firmware behavior or every post-reset driver failure. The native Ubuntu Pi adapter retains its earlier flow and does not gain this UEFI rollback protocol.
