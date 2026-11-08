@@ -1,0 +1,23 @@
+name: Native ARM64 official source conversion
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  source:
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [ubuntu, fedora]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libssl-dev libcurl4-openssl-dev nlohmann-json3-dev qemu-utils rsync squashfs-tools btrfs-progs
+      - run: cmake -S . -B build -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr && cmake --build build -j2
+      - name: Convert actual official ARM64 image without arming a reset
+        run: sudo env GITHUB_ACTIONS=true SOURCE_ARCH=arm64 PROFILE_ONLY=true bash tests/engine-image.sh '${{ matrix.distro }}' none
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: source-arm64-${{ matrix.distro }}
+          path: evidence/
