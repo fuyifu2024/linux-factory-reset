@@ -64,13 +64,31 @@ if [[ $REC_GUI == yes && $cycle -eq 1 ]]; then
     sleep 2
     mkdir -p /mnt/recovery/gui-evidence
     chmod 777 /mnt/recovery/gui-evidence
+    original_order=$(efibootmgr | sed -n 's/^BootOrder: //p')
+    (
+        while :; do
+            if [[ -f /mnt/recovery/gui-evidence/request-arm && ! -f /mnt/recovery/gui-evidence/armed ]]; then
+                linux-factory-reset arm --confirm ERASE-ALL-USERS
+                test -f /var/lib/ubuntu-reset/request
+                touch /mnt/recovery/gui-evidence/armed
+            fi
+            if [[ -f /mnt/recovery/gui-evidence/request-check-cancel ]]; then
+                test ! -e /var/lib/ubuntu-reset/request
+                test "$(efibootmgr | sed -n 's/^BootOrder: //p')" = "$original_order"
+                grep -qx 'old private data' /root/lfr-private
+                touch /mnt/recovery/gui-evidence/cancel-verified
+                break
+            fi
+            sleep 1
+        done
+    ) &
     runuser -u lfr_old_user -- env DISPLAY=:99 GDK_BACKEND=x11 GSK_RENDERER=cairo LIBGL_ALWAYS_SOFTWARE=1 dbus-run-session -- bash -c '
         openbox >/mnt/recovery/gui-evidence/openbox.txt 2>&1 &
         /usr/bin/linux-factory-reset gui >/mnt/recovery/gui-evidence/gui.txt 2>&1 &
         gui_pid=$!
         xterm -T "LFR authorization" -e script -q -f /mnt/recovery/gui-evidence/auth.txt -c "pkttyagent --process $gui_pid" &
         node /mnt/recovery/drive-gui.mjs "$gui_pid" /mnt/recovery/gui-evidence /mnt/recovery/GUI-ARM-NOW
-        wait "$gui_pid"'
+        wait "$gui_pid"' || [[ -e /mnt/recovery/gui-evidence/begin-restore ]]
     exit 0
 fi
 if [[ $REC_MODE == automatic ]]; then
@@ -87,7 +105,6 @@ for attempt in 1 2; do
     test ! -e /var/lib/ubuntu-reset/request
     test "$(efibootmgr | sed -n 's/^BootOrder: //p')" = "$original_order"
 done
-profile=$(find /mnt/recovery/ubuntu-reset -maxdepth 1 -name 'factory-*.squashfs' -type f | sort | tail -1)
 # Corrupt only the selected current profile, then restore its original bytes by truncation.
 profile=$(sed -n 's/.*"file": "\([^" ]*\)".*/\1/p' /etc/ubuntu-reset/state.json)
 profile=/mnt/recovery/$profile

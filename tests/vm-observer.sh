@@ -2,7 +2,7 @@
 set -o pipefail
 source /mnt/recovery/lfr-qa.conf
 read -r cycle </mnt/recovery/qa-cycle
-    exec > >(tee /var/lib/lfr-qa-diagnostics /dev/ttyS0) 2>&1
+    exec > >(tee /var/lib/lfr-qa-diagnostics /dev/console) 2>&1
     for ((i=0;i<180;i++)); do
         if test -f /var/lib/ubuntu-reset-firstboot-complete; then
             id lfrqatest
@@ -20,7 +20,10 @@ read -r cycle </mnt/recovery/qa-cycle
             sync
             if grep -qx PASS /var/lib/lfr-qa-result && (( cycle < REC_CYCLES )); then
                 echo "LFR_VM_CYCLE_PASS $cycle"
-                systemd-run --unit=lfr-qa-next --setenv="REC_UUID=$REC_UUID" --property=StandardOutput=journal+console /bin/bash /mnt/recovery/vm-guest.sh
+                next_context=()
+                if [[ -e /etc/fedora-release ]]; then next_context=(--property=SELinuxContext=system_u:system_r:initrc_t:s0); fi
+                sleep 2
+                systemd-run "${next_context[@]}" --unit=lfr-qa-next --setenv="REC_UUID=$REC_UUID" --property=StandardOutput=journal+console /bin/bash /mnt/recovery/vm-guest.sh
             else
                 echo LFR_VM_ALL_CYCLES_COMPLETE
                 systemctl --no-block poweroff
