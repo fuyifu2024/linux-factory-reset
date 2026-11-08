@@ -1,12 +1,12 @@
 # Linux Factory Reset
 
-[中文](README.md) · [Releases](https://github.com/fuyifu2024/linux-factory-reset/releases) · [Acceptance evidence](docs/validation/v0.5.0-alpha.1.md)
+[中文](README.md) · [Download Beta](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-beta.1) · [Validation evidence](docs/validation/v0.5.0-beta.1.md) · [Feedback and suggestions](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
 
 A C++20 official-image downloader and experimental Linux recovery tool, with small offline Shell components. Previously named `ubuntu-reset`; the old command remains compatible.
 
-**The Beta candidate is not released:** two successive GUI/CLI restores and interrupted-write rollback passed. ARM64 restored and booted into initial setup, but completed administrator creation and real sudo remain unverified. See the [candidate record](docs/validation/v0.5.0-beta.1.md).
+**v0.5.0-beta.1 public testing:** follow the [testing guide](docs/beta-testing.md) in a disposable VM and report bugs or suggestions. Completed checks and remaining validation gaps are listed separately below.
 
-**v0.5 is an experimental preview for the systems and layouts listed in its acceptance record.** Actual AMD64 UEFI VMs running Ubuntu 26.04, Debian 13 and Fedora 45 have completed automatic restoration, old-account/file removal, new-administrator setup and real sudo checks. ARM64 has native build and source-conversion evidence, without guest-boot validation. Consult the exact evidence and fault-test scope.
+Ubuntu 26.04 AMD64 completed the real GUI flow, two successive restorations, new-administrator/sudo checks and interrupted-write rollback. Debian 13 and Fedora 45 AMD64 restoration baselines are linked in the evidence. **Ubuntu 26.04 ARM64 restored and booted into initial setup, but completed account creation and real sudo remain unverified; the corrected keyboard driver has not been rerun.** Consult the record for other combinations and physical-hardware limits.
 
 | Feature | Scope |
 | --- | --- |
@@ -70,4 +70,4 @@ cmake --build build -j2
 ctest --test-dir build --output-on-failure
 ```
 
-Heavy builds, large images and actual restoration tests run on disposable remote runners, not the user's Raspberry Pi. CI covers native architectures, package installation, HTTPS download/cancellation, GPU-free GUI and directory fixtures. Disposable UEFI VMs separately exercise boot, account/data removal, a usable sudo administrator and rollback. Successful ARM64 source conversion does not establish ARM guest boot or physical-hardware compatibility.
+Heavy builds, large images and actual restoration tests run on disposable remote runners, not the user's Raspberry Pi. CI covers native architectures, package installation, HTTPS download/cancellation, GPU-free GUI and directory fixtures. Restoration, first-user setup and real sudo results are recorded separately. ARM64 conversion, restored-system boot and account completion are distinct checks; physical hardware remains unverified.

@@ -1,12 +1,12 @@
 # Linux Factory Reset
 
-[English](README.en.md) · [下载 / Releases](https://github.com/fuyifu2024/linux-factory-reset/releases) · [验收记录](docs/validation/v0.5.0-alpha.1.md)
+[English](README.en.md) · [下载 Beta](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-beta.1) · [验证记录](docs/validation/v0.5.0-beta.1.md) · [反馈与建议](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
 
 C++20 编写的 Linux 官方镜像下载与实验性恢复工具，恢复阶段使用少量 Shell。原名 `ubuntu-reset`，旧命令仍兼容。
 
-**Beta 候选尚未发布：** GUI 连续两次恢复和断电回退已通过；ARM64 已恢复并开机进入首次设置，但新管理员完成及 sudo 尚未验收。见 [Beta 候选记录](docs/validation/v0.5.0-beta.1.md)。
+**v0.5.0-beta.1 公开测试：** 欢迎按 [公测指南](docs/beta-testing.md) 在可丢弃虚拟机中体验，并提交错误和功能建议。下面明确区分已通过的验证和仍待验收的项目。
 
-**v0.5 是实验性开发预览版，仅面向验收记录列出的系统与布局。** Ubuntu 26.04、Debian 13、Fedora 45 的 AMD64 UEFI 虚拟机已完成真实自动恢复、旧用户及文件删除、新管理员创建和 sudo 检查；ARM64 已验证原生构建和镜像转换，尚未验证客体启动。具体范围及故障测试见验收记录。
+Ubuntu 26.04 AMD64 已完成真实 GUI 流程、连续两次恢复、新管理员与 sudo、断电回退。Debian 13、Fedora 45 AMD64 的真实恢复基线见验证记录。**Ubuntu 26.04 ARM64 已实际恢复并启动首次设置，但开户完成与 sudo 尚未验收；测试输入驱动已修正，尚未复测。** 其他组合和物理硬件的验证范围请以记录为准。
 
 | 功能 | 范围 |
 | --- | --- |
@@ -70,4 +70,4 @@ cmake --build build -j2
 ctest --test-dir build --output-on-failure
 ```
 
-本项目的重编译、大镜像和真实恢复验收运行在云端一次性环境，不在用户的树莓派上执行。CI 包含原生 AMD64/ARM64 构建、包安装、HTTPS 下载/取消、无 GPU GUI 和临时目录测试；真实启动、清除用户、创建可 sudo 的新管理员及回退另由可丢弃 UEFI VM 验证。ARM64 镜像导入通过不代表 ARM 客体启动或物理硬件已验证。
+本项目的重编译、大镜像和真实恢复验收运行在云端一次性环境，不在用户的树莓派上执行。CI 包含原生 AMD64/ARM64 构建、包安装、HTTPS 下载/取消、无 GPU GUI 和临时目录测试；实际恢复、首次开户与 sudo 的通过范围分别记录。ARM64 转换、恢复开机和开户是不同验收项目；物理硬件仍待验证。

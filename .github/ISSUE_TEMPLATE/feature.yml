@@ -1,0 +1,21 @@
+name: Suggestion / 功能建议
+description: Suggest an improvement for the public Beta / 为公测版提出改进建议
+title: '[Suggestion] '
+body:
+  - type: input
+    id: environment
+    attributes:
+      label: Version and environment / 版本与使用环境
+      placeholder: v0.5.0-beta.1, Ubuntu 26.04, ARM64 UEFI VM
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested improvement / 改进建议
+      description: Describe the problem and the behavior you would like / 请说明遇到的问题和希望的使用方式
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context / 补充说明
+      description: Please omit passwords, keys and personal files / 请勿上传密码、密钥或个人文件
