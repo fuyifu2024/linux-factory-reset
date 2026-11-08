@@ -51,6 +51,7 @@ json distribution(const std::string& os_release);
 std::string select_platform(const std::string& arch, bool uefi, const std::string& model, const std::string& distro);
 std::string state_distro(const json& state);
 fs::path efi_directory(const fs::path& boot, const std::string& distro);
+void exclusive_esp(const fs::path& boot, const std::string& distro);
 void require_inside(const fs::path& tree, const fs::path& path);
 void validate_reference(const fs::path& root, const fs::path& boot, const std::string& kind, bool prepared);
 struct TempDir {

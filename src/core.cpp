@@ -167,6 +167,14 @@ fs::path efi_directory(const fs::path& boot, const std::string& distro) {
     need(distro == "ubuntu" || distro == "debian" || distro == "fedora", "Invalid EFI distributor");
     return boot / "EFI" / distro;
 }
+void exclusive_esp(const fs::path& boot, const std::string& distro) {
+    for (const auto& entry : fs::directory_iterator(boot / "EFI")) {
+        auto name = entry.path().filename().string();
+        for (auto& c : name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        need(name == "boot" || name == distro || name == "linuxfactoryreset",
+             "Shared/OEM EFI partition is unsupported; recovery will not delete another OS or vendor's boot files");
+    }
+}
 void validate_state(const json& s) {
     need(s.at("schema") == 1 || s.at("schema") == 2, "Unsupported state schema");
     auto kind = s.at("platform").get<std::string>();

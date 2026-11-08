@@ -36,6 +36,7 @@ json hardware() {
     if (kind != "raspi-arm64") {
         need(fs::is_regular_file(efi_directory(boot, os.at("id")) / "grub.cfg") && fs::is_regular_file(os.at("id") == "fedora" ? "/boot/grub2/grub.cfg" : "/boot/grub/grub.cfg"),
              "Target must use its distribution's standard GRUB + EFI vendor-directory layout");
+        exclusive_esp(boot, os.at("id"));
     }
     auto root = filesystem("/"); auto fw = filesystem(boot);
     need(root["fstype"] == "ext4" && fw["fstype"] == "vfat" && root["target"] == "/" && fw["target"] == boot,

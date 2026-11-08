@@ -20,6 +20,12 @@ static json state() {
 int main() {
     try {
         TempDir tmp("/tmp");
+        auto shared_esp = tmp.path / "esp-guard";
+        fs::create_directories(shared_esp / "EFI/ubuntu"); fs::create_directories(shared_esp / "EFI/BOOT");
+        exclusive_esp(shared_esp, "ubuntu"); ++checks;
+        fs::create_directories(shared_esp / "EFI/LinuxFactoryReset"); exclusive_esp(shared_esp, "ubuntu"); ++checks;
+        fs::create_directories(shared_esp / "EFI/Microsoft");
+        rejects([&] {exclusive_esp(shared_esp, "ubuntu");}, "shared ESP cannot lose another operating system's loader");
         auto missing = tmp.path / "missing-state.json";
         check(preparation_status(missing, false).at("code") == "not-prepared", "preview without recovery data has a guided state");
         try { load_state(missing, false); check(false, "missing state rejected"); }
