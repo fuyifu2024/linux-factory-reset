@@ -5,6 +5,7 @@ read -r cycle </mnt/recovery/qa-cycle
     exec > >(tee /var/lib/lfr-qa-diagnostics /dev/console) 2>&1
     for ((i=0;i<180;i++)); do
         if test -f /var/lib/ubuntu-reset-firstboot-complete; then
+            uname -m
             id lfrqatest
             passwd -S root
             if test -e /etc/fedora-release && test "$(getenforce)" != Enforcing; then echo LFR_VM_SELINUX_FAIL; systemctl --no-block poweroff; exit 1; fi

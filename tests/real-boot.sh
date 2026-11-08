@@ -115,7 +115,7 @@ vm_pid=$!
 }
 start_vm
 set +e
-node tests/drive-firstboot.mjs "$work/qmp.sock" "$evidence/vm-serial.txt" "$fault"
+VM_PID="$vm_pid" node tests/drive-firstboot.mjs "$work/qmp.sock" "$evidence/vm-serial.txt" "$fault"
 status=$?
 set -e
 if [ "$status" -eq 42 ] && [ "$fault" = powercut ]; then
@@ -123,7 +123,7 @@ if [ "$status" -eq 42 ] && [ "$fault" = powercut ]; then
     cp "$evidence/vm-serial.txt" "$evidence/before-power-cut.txt"
     : >"$evidence/vm-serial.txt"
     start_vm
-    node tests/drive-firstboot.mjs "$work/qmp.sock" "$evidence/vm-serial.txt" rollback
+    VM_PID="$vm_pid" node tests/drive-firstboot.mjs "$work/qmp.sock" "$evidence/vm-serial.txt" rollback
 else
     [ "$status" -eq 0 ]
 fi

@@ -19,6 +19,10 @@ while (Date.now() < deadline) {
   if (/LFR_VM_(?:PREPARATION_FAIL|OLD_DATA_SURVIVED|NEW_USER_FAIL|SETUP_TIMEOUT|SELINUX_FAIL)/.test(log)) throw Error('Real VM reported a failed recovery; inspect serial evidence');
   if (typed && log.includes('reboot: Power down')) { console.log('Guest powered off; the host must verify its synced result and restored filesystem.'); process.exit(0); }
   if (log.includes('LFR_VM_ALL_CYCLES_COMPLETE') || log.includes('LFR_VM_RESTORE_PASS')) { await delay(5000); console.log('Real UEFI VM restored, removed old users/data and created a new sudo administrator.'); process.exit(0); }
+  if (process.env.VM_PID) {
+    const proc='/proc/'+process.env.VM_PID+'/stat';
+    if (!fs.existsSync(proc) || /^\d+ \(.*\) Z /.test(fs.readFileSync(proc,'utf8'))) throw Error('QEMU exited before a verified result; inspect qemu.txt and serial evidence');
+  }
   if (!typed && log.includes('LFR_VM_AWAITING_NEW_USER')) {
     typed = true; setupAt = Date.now();
     const socket = net.createConnection(socketPath);
