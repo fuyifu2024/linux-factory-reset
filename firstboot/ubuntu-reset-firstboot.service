@@ -1,8 +1,8 @@
 [Unit]
-Description=Create a new administrator after Debian/Ubuntu factory reset
+Description=Create a new administrator after Linux factory reset
 ConditionPathExists=!/var/lib/ubuntu-reset-firstboot-complete
 After=local-fs.target
-Before=display-manager.service getty@tty1.service
+Before=display-manager.service getty@tty1.service kmsconvt@tty1.service
 
 [Service]
 Type=oneshot

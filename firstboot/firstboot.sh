@@ -31,5 +31,9 @@ touch /var/lib/ubuntu-reset-firstboot-complete
 # Disable the one-time setup; Before=getty@tty1 orders login after this script exits.
 rm -f /etc/systemd/system/multi-user.target.wants/ubuntu-reset-firstboot.service
 systemctl daemon-reload
-systemctl --no-block start getty@tty1.service
+if [[ -f /usr/lib/systemd/system/kmsconvt@.service ]]; then
+    systemctl --no-block start kmsconvt@tty1.service
+else
+    systemctl --no-block start getty@tty1.service
+fi
 echo 'Initial setup complete. / 首次设置完成。'
