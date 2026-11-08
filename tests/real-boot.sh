@@ -22,7 +22,8 @@ cleanup() {
     rm -rf "$work"
 }
 trap cleanup EXIT HUP INT TERM
-[ -c /dev/kvm ] || { echo 'KVM unavailable: real boot NOT validated'; exit 1; }
+arch=${SOURCE_ARCH:-amd64}
+if [ "$arch" = amd64 ]; then [ -c /dev/kvm ] || { echo 'KVM unavailable'; exit 1; }; fi
 cp --sparse=always "$source" "$work/target.raw"
 truncate -s 32G "$work/recovery.raw"
 recovery_loop=$(losetup --find --show "$work/recovery.raw")
@@ -146,6 +147,7 @@ udevadm settle
 echo LFR_VM_READY_TO_ARM >/dev/ttyS0
 linux-factory-reset arm --confirm ERASE-ALL-USERS --reboot
 GUEST
+if [ "$arch" = arm64 ]; then sed -i s/ttyS0/ttyAMA0/g "$work/target/usr/local/sbin/lfr-qa"; fi
 chmod 755 "$work/target/usr/local/sbin/lfr-qa"
 cat >"$work/target/etc/systemd/system/lfr-qa.service" <<'UNIT'
 [Unit]
@@ -165,10 +167,19 @@ ln -s ../lfr-qa.service "$work/target/etc/systemd/system/multi-user.target.wants
 sync
 umount "$work/target"
 losetup --detach "$target_loop"; target_loop=''
-cp /usr/share/OVMF/OVMF_VARS_4M.fd "$work/vars.fd"
+if [ "$arch" = arm64 ]; then cp /usr/share/AAVMF/AAVMF_VARS.fd "$work/vars.fd"; else cp /usr/share/OVMF/OVMF_VARS_4M.fd "$work/vars.fd"; fi
 start_vm() {
-qemu-system-x86_64 -machine q35,accel=kvm -cpu host -m 2048 -smp 2 -display none -vga std \
-    -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+if [ "$arch" = arm64 ]; then
+    accel=tcg; cpu=max
+    if [ -c /dev/kvm ]; then accel=kvm; cpu=host; fi
+    set -- qemu-system-aarch64 -machine "virt,accel=$accel,gic-version=3" -cpu "$cpu" -device virtio-gpu-pci -device qemu-xhci -device usb-kbd
+    code=/usr/share/AAVMF/AAVMF_CODE.fd
+else
+    set -- qemu-system-x86_64 -machine q35,accel=kvm -cpu host -vga std
+    code=/usr/share/OVMF/OVMF_CODE_4M.fd
+fi
+"$@" -m 3072 -smp 2 -display none \
+    -drive if=pflash,format=raw,readonly=on,file="$code" \
     -drive if=pflash,format=raw,file="$work/vars.fd" \
     -drive if=virtio,format=raw,file="$work/target.raw" -drive if=virtio,format=raw,file="$work/recovery.raw" \
     -netdev user,id=n -device virtio-net-pci,netdev=n -serial file:"$evidence/vm-serial.txt" \

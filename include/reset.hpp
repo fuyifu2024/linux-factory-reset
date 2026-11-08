@@ -14,7 +14,7 @@ using json = nlohmann::json;
 using Args = std::vector<std::string>;
 struct Error : std::runtime_error { using std::runtime_error::runtime_error; };
 struct Result { int code; std::string text; };
-inline constexpr auto VERSION = "0.5.0-alpha.1";
+inline constexpr auto VERSION = "0.5.0-beta.1";
 inline const fs::path STATE = "/etc/ubuntu-reset/state.json";
 inline const fs::path REQUEST = "/var/lib/ubuntu-reset/request";
 void need(bool condition, const std::string& message);

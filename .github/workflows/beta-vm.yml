@@ -1,0 +1,55 @@
+name: Beta actual VM acceptance
+run-name: 'Beta ${{ inputs.distro }} ${{ inputs.arch }} / ${{ inputs.fault }}'
+on:
+  workflow_dispatch:
+    inputs:
+      distro:
+        type: choice
+        options: [ubuntu, fedora]
+        default: ubuntu
+      arch:
+        type: choice
+        options: [arm64, amd64]
+        default: arm64
+      fault:
+        type: choice
+        options: [none, failure, powercut]
+        default: none
+permissions:
+  contents: read
+jobs:
+  vm:
+    runs-on: ${{ inputs.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disposable runner dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libcurl4-openssl-dev nlohmann-json3-dev qemu-utils qemu-system-x86 qemu-system-arm qemu-efi-aarch64 ovmf gdisk parted nodejs rsync squashfs-tools btrfs-progs dosfstools
+      - run: cmake -S . -B build -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr && cmake --build build -j2
+      - name: Build native guest package
+        env:
+          DISTRO: ${{ inputs.distro }}
+        run: |
+          if [ "$DISTRO" = fedora ]; then
+            docker run --rm -v "$PWD:/src" -w /src fedora:45 bash -ec '
+              dnf install -y gcc-c++ cmake openssl-devel libcurl-devel json-devel rpm-build file rsync squashfs-tools
+              cmake -S . -B build-native -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+              cmake --build build-native -j2
+              ctest --test-dir build-native --output-on-failure
+              cd build-native; cpack -G RPM'
+          else
+            docker run --rm -v "$PWD:/src" -w /src ubuntu:26.04 bash -ec '
+              apt-get update
+              apt-get install -y build-essential cmake libssl-dev libcurl4-openssl-dev nlohmann-json3-dev file rsync squashfs-tools
+              cmake -S . -B build-native -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+              cmake --build build-native -j2
+              ctest --test-dir build-native --output-on-failure
+              cd build-native; cpack -G DEB'
+          fi
+      - name: Boot and restore an actual disposable VM
+        run: sudo env GITHUB_ACTIONS=true SOURCE_ARCH='${{ inputs.arch }}' VM_TIMEOUT_MINUTES=40 bash tests/engine-image.sh '${{ inputs.distro }}' '${{ inputs.fault }}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: beta-${{ inputs.distro }}-${{ inputs.arch }}-${{ inputs.fault }}
+          path: evidence/

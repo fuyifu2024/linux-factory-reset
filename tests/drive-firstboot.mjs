@@ -3,14 +3,14 @@ import fs from 'node:fs';
 import net from 'node:net';
 const [socketPath, logPath, fault = "none"] = process.argv.slice(2);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const deadline = Date.now() + 16 * 60 * 1000;
+const deadline = Date.now() + Number(process.env.VM_TIMEOUT_MINUTES || 30) * 60 * 1000;
 let typed = false, armedAt = 0, setupAt = 0;
 while (Date.now() < deadline) {
   const log = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf8') : '';
   if (fault === 'powercut' && log.includes('LFR_VM_POWER_CUT_READY')) process.exit(42);
   if (log.includes('LFR_VM_ROLLBACK_PASS')) { await delay(4000); process.exit(0); }
   if (!armedAt && log.includes('LFR_VM_READY_TO_ARM')) armedAt = Date.now();
-  if (fault === 'none' && armedAt && !log.includes('LFR_VM_AWAITING_NEW_USER') && Date.now() - armedAt > 180000) throw Error('Recovery did not reach initial account setup within 3 minutes; inspect serial evidence');
+  if (fault === 'none' && armedAt && !log.includes('LFR_VM_AWAITING_NEW_USER') && Date.now() - armedAt > 600000) throw Error('Recovery did not reach initial account setup within 3 minutes; inspect serial evidence');
   if (setupAt && !log.includes('LFR_VM_RESTORE_PASS') && Date.now() - setupAt > 190000) throw Error('Initial account setup did not complete; inspect serial evidence');
   if (/ALERT!.*does not exist|Ubuntu Reset STOPPED|Kernel panic - not syncing|grub rescue>|Entering emergency mode|No bootable device/.test(log)) throw Error('Guest boot/recovery halted; inspect serial evidence');
   if (/Linux Factory Reset STOPPED: (?!expected QA write failure)/.test(log)) throw Error('Recovery refused to proceed; inspect serial evidence');

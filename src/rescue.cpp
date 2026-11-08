@@ -37,7 +37,7 @@ void install_rescue(const json& s, const fs::path& profile, const fs::path& init
            "\nchainloader ($normal)/EFI/" + state_distro(s) + "/" + loader + "\nboot\nfi\nset timeout=10\nset default=0\n";
     for (bool rollback : {false, true}) {
         cfg += "menuentry 'Linux Factory Reset: " + std::string(rollback ? "roll back previous system" : "recover / continue") + "' {\n";
-        cfg += "linux ($store)" + rel + "/vmlinuz root=UUID=" + s.at("root_uuid").get<std::string>() + " ro lfr.rescue=" + id + (rollback ? " lfr.rollback=1" : "") + " console=tty0 console=ttyS0,115200\n";
+        cfg += "linux ($store)" + rel + "/vmlinuz root=UUID=" + s.at("root_uuid").get<std::string>() + " ro lfr.rescue=" + id + (rollback ? " lfr.rollback=1" : "") + " console=tty0 console=" + std::string(s.at("platform") == "arm64-uefi" ? "ttyAMA0" : "ttyS0") + ",115200\n";
         cfg += "initrd ($store)" + rel + "/initrd\n}\n";
     }
     atomic_write(recovery / "grub.cfg", cfg);

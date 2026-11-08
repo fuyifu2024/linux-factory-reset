@@ -54,7 +54,7 @@ unsquashfs -no-progress -d "$work/profile" "$work/factory.squashfs"
 rsync -aHAX "$work/profile/root/" "$work/root/"
 rsync -rt "$work/profile/boot/" "$work/esp/"
 . boot/relocate.sh
-uf_relocate x86_64-uefi "$distro" "$work/root" "$work/esp" "$root_uuid" "$boot_uuid"
+uf_relocate "$platform" "$distro" "$work/root" "$work/esp" "$root_uuid" "$boot_uuid"
 # Only the starting QA guest skips the account wizard. Its recovery profile uses it normally.
 rm -f "$work/root/etc/systemd/system/multi-user.target.wants/ubuntu-reset-firstboot.service"
 sync; umount "$work/root"; umount "$work/esp"; losetup -d "$loop"; loop=''

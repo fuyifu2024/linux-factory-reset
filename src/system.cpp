@@ -398,7 +398,7 @@ static void import_disk_image(const fs::path& image, const fs::path& profile, co
         if (!fs::is_regular_file(tree / "boot" / ("vmlinuz-"+version))) continue;
         auto initrd = (distro == "fedora" ? "initramfs-" : "initrd.img-") + version + (distro == "fedora" ? ".img" : "");
         need(fs::is_regular_file(tree / "boot" / initrd), "Missing source initramfs");
-        menu += "menuentry 'Factory initial system' {\nlinux /boot/vmlinuz-"+version+" root=UUID="+root_uuid+" ro console=tty0 console=ttyS0,115200\ninitrd /boot/"+initrd+"\n}\n"; have_kernel = true;
+        menu += "menuentry 'Factory initial system' {\nlinux /boot/vmlinuz-"+version+" root=UUID="+root_uuid+" ro console=tty0 console="+(platform == "arm64-uefi" ? "ttyAMA0" : "ttyS0")+",115200\ninitrd /boot/"+initrd+"\n}\n"; have_kernel = true;
     }
     need(have_kernel, "Source has no installed kernel"); fs::create_directories(tree / "boot" / grubdir);
     write(tree / "boot" / grubdir / "grub.cfg", menu);
