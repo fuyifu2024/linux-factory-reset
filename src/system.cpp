@@ -284,6 +284,11 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
     }
     if (meta.at("distro") == "fedora") {
         require_inside(r, r / "etc/kernel/cmdline"); fs::create_directories(r / "etc/kernel"); write(r / "etc/kernel/cmdline", "root=UUID=@ROOT_UUID@ ro\n");
+        // Cloud-init is disabled, so networking must not rely on cloud metadata.
+        auto network = r / "etc/NetworkManager/system-connections/factory-dhcp.nmconnection";
+        require_inside(r, network); fs::create_directories(network.parent_path());
+        write(network, "[connection]\nid=factory-dhcp\ntype=ethernet\nautoconnect=true\n[ethernet]\n[ipv4]\nmethod=auto\n[ipv6]\nmethod=auto\n");
+        fs::permissions(network, fs::perms::owner_read | fs::perms::owner_write);
         write(r / ".autorelabel", "-F\n");
     }
     // Empty runtime mountpoint directories are needed for the next boot.

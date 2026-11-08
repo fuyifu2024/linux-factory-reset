@@ -1,7 +1,7 @@
 #!/bin/bash
 check() { [[ -f /etc/ubuntu-reset/boot.conf ]]; }
 depends() { echo 'rootfs-block'; }
-installkernel() { instmods ext4 squashfs loop vfat nls_utf8 nls_ascii nls_cp437; }
+installkernel() { instmods ext4 squashfs loop vfat nls_utf8 nls_ascii nls_cp437 efivarfs; }
 install() {
     inst_simple /etc/ubuntu-reset/boot.conf /conf/ubuntu-reset.conf
     for asset in restore.sh reconcile.sh relocate.sh; do inst_simple "/usr/lib/ubuntu-reset/$asset" "/usr/lib/ubuntu-reset/$asset"; done
