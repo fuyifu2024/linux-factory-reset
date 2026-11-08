@@ -1,0 +1,39 @@
+name: Native Fedora packages
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    container: fedora:45
+    steps:
+      - run: dnf install -y gcc-c++ cmake openssl-devel libcurl-devel json-devel rsync squashfs-tools rpm-build file git
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr && cmake --build build -j2
+      - run: ctest --test-dir build --output-on-failure
+      - run: cd build && cpack -G RPM
+      - name: Install without arming a reset
+        run: |
+          dnf install -y ./build/*.rpm
+          linux-factory-reset --version
+          linux-factory-reset status
+          test -x /usr/lib/dracut/modules.d/95linux-factory-reset/module-setup.sh
+          test ! -e /var/lib/ubuntu-reset/request
+      - name: Collect release artifacts
+        run: |
+          TASK_ARCH=$(rpm --eval '%{_arch}')
+          mkdir -p build/release
+          cp build/*.rpm "build/release/linux-factory-reset_0.5.0-alpha.1_fedora45_${TASK_ARCH}.rpm"
+          cp build/linux-factory-reset "build/release/linux-factory-reset-fedora45-linux-${TASK_ARCH}"
+          strip "build/release/linux-factory-reset-fedora45-linux-${TASK_ARCH}"
+          cd build/release
+          sha256sum * > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fedora45-${{ matrix.runner }}
+          path: build/release/*
