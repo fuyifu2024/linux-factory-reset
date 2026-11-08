@@ -83,9 +83,24 @@ void require_inside(const fs::path& tree, const fs::path& path) {
 }
 static void reference_paths(const fs::path& root, const fs::path& boot) {
     for (const auto& path : {"usr/lib/os-release", "usr/bin/bash", "etc/passwd", "etc/shadow", "etc/group", "etc/fstab", "var/lib/dpkg/status",
-             "home", "usr/lib/modules", "boot", "usr/bin/sudo", "usr/bin/passwd", "usr/sbin/useradd", "usr/sbin/usermod",
+             "home", "usr/lib/modules", "boot", "usr/bin/passwd", "usr/sbin/useradd", "usr/sbin/usermod",
              "etc", "var/lib/dbus", "var/lib/systemd", "etc/ssh", "usr/lib/ubuntu-reset", "etc/systemd/system", "var/lib/ubuntu-reset-firstboot-ready", "usr/lib/sysimage/rpm/rpmdb.sqlite", "etc/kernel/cmdline", ".autorelabel"}) require_inside(root, root / path);
     for (const auto& path : {"EFI", "current", "config.txt"}) require_inside(boot, boot / path);
+}
+
+static bool reference_sudo(const fs::path& root) {
+    // Ubuntu 26 uses an absolute update-alternatives chain. Resolve the two known
+    // links inside the offline image; following them normally would inspect the host.
+    auto path = root / "usr/bin/sudo"; require_inside(root, path.parent_path());
+    if (fs::is_symlink(path) && fs::read_symlink(path) == "/etc/alternatives/sudo") {
+        path = root / "etc/alternatives/sudo"; require_inside(root, path.parent_path());
+        if (!fs::is_symlink(path)) return false;
+        auto target = fs::read_symlink(path);
+        need(target.is_absolute(), "Unsupported sudo alternative link");
+        path = root / target.relative_path();
+    }
+    require_inside(root, path);
+    return fs::is_regular_file(path);
 }
 
 static json reference(const fs::path& root, const fs::path& boot, const std::string& kind, bool prepared) {
@@ -141,7 +156,8 @@ static json reference(const fs::path& root, const fs::path& boot, const std::str
         need(kernel_set, "UEFI reference needs a matching installed kernel, initrd and modules directory; bootability still requires a VM/hardware test");
         // An unsigned GRUB installation is valid when Secure Boot is disabled.
         // If shim is used, its presence/validity remains the trusted profile producer's responsibility.
-        for (const auto& name : {"usr/bin/sudo", "usr/bin/passwd", "usr/sbin/useradd", "usr/sbin/usermod"})
+        need(reference_sudo(root), "Reference needs a working sudo / sudo-rs installation");
+        for (const auto& name : {"usr/bin/passwd", "usr/sbin/useradd", "usr/sbin/usermod"})
             need(fs::is_regular_file(root / name), "UEFI first-user setup requires sudo/passwd account tools: " + std::string(name));
         need(std::regex_search(read(root / "etc/group"), std::regex(os.at("id") == "fedora" ? "(^|\n)wheel:[^:]*:[0-9]+:" : "(^|\n)sudo:[^:]*:[0-9]+:")), "Reference must contain its administrator group");
         if (prepared) need(fs::is_regular_file(root / "var/lib/ubuntu-reset-firstboot-ready") && fs::is_regular_file(root / "usr/lib/ubuntu-reset/firstboot.sh"), "UEFI profile is missing the initial-user setup flow");
