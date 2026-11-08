@@ -2,7 +2,7 @@
 # Runs before switch_root, while no processes from the installed OS are running.
 set -u
 # Prefer the explicitly bundled tools over a distro's earlier BusyBox applets.
-PATH=/usr/bin:/usr/sbin:/bin:/sbin
+PATH=/usr/lib/ubuntu-reset/bin:/usr/bin:/usr/sbin:/bin:/sbin
 export PATH
 [ -f /conf/ubuntu-reset.conf ] || exit 0
 . /conf/ubuntu-reset.conf
