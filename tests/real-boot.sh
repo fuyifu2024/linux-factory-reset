@@ -33,6 +33,8 @@ mkdir "$work/recovery" "$work/target"
 mount "$recovery_loop" "$work/recovery"
 if [ "$mode" = local ]; then cp --sparse=always "$source" "$work/recovery/pristine.raw"; fi
 if [ "$distro" = fedora ]; then cp "$package" "$work/recovery/tool.rpm"; else cp "$package" "$work/recovery/tool.deb"; fi
+cp tests/vm-guest.sh tests/vm-observer.sh tests/drive-gui.mjs "$work/recovery/"
+printf 'REC_UUID=%s\nREC_MODE=%s\nREC_DISTRO=%s\nREC_FAULT=%s\nREC_CYCLES=%s\nREC_GUI=%s\n' "$recovery_uuid" "$mode" "$distro" "$fault" "${RESET_CYCLES:-1}" "${GUI_ACCEPTANCE:-no}" >"$work/recovery/lfr-qa.conf"
 umount "$work/recovery"
 losetup --detach "$recovery_loop"; recovery_loop=''
 target_loop=$(losetup --find --show --partscan "$work/target.raw")
@@ -62,91 +64,8 @@ done
 umount "$work/target-boot"
 mkdir -p "$work/target/usr/local/sbin" "$work/target/etc/systemd/system/multi-user.target.wants"
 ln -sf /dev/null "$work/target/etc/systemd/system/systemd-firstboot.service"
-printf 'REC_UUID=%s\nREC_MODE=%s\nREC_DISTRO=%s\nREC_FAULT=%s\n' "$recovery_uuid" "$mode" "$distro" "$fault" >"$work/target/etc/lfr-qa.conf"
-cat >"$work/target/usr/local/sbin/lfr-qa" <<'GUEST'
-#!/bin/bash
-set -Eeuo pipefail
-trap 'echo LFR_VM_PREPARATION_FAIL >/dev/ttyS0; systemctl --no-block poweroff' ERR
-source /etc/lfr-qa.conf
-mkdir -p /mnt/recovery
-mount -t ext4 "UUID=$REC_UUID" /mnt/recovery
-if [[ $REC_FAULT != none ]] && grep -qx ROLLED_BACK /mnt/recovery/ubuntu-reset/rescue-*/result 2>/dev/null; then
-    getent passwd lfr_old_user
-    grep -qx 'old private data' /root/lfr-private
-    grep -qx 'old home' /home/lfr_old_user/private
-    grep -qx 'extra software' /opt/lfr-extra/unwanted
-    test ! -e /var/lib/ubuntu-reset/request
-    echo PASS >/var/lib/lfr-qa-result; sync; echo LFR_VM_ROLLBACK_PASS >/dev/ttyS0
-    systemctl --no-block poweroff; exit 0
-fi
-if [[ $REC_DISTRO == fedora ]]; then
-    dnf install -y /mnt/recovery/tool.rpm
-else
-    apt-get update
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends /mnt/recovery/tool.deb
-fi
-# Fault injection alters only the disposable guest's installed test copy.
-if [[ $REC_FAULT != none ]]; then
-    if [[ $REC_FAULT == failure ]]; then
-        sed -i '/uf_relocate .*Cannot relocate/a uf_fail "expected QA write failure"' /usr/lib/ubuntu-reset/restore.sh
-    else
-        sed -i '/echo .*removing users/a rm -rf "$UF_TARGET/boot" "$UF_TARGET/usr"; sync; echo LFR_VM_POWER_CUT_READY >/dev/console; sleep 600' /usr/lib/ubuntu-reset/restore.sh
-    fi
-fi
-useradd --create-home --shell /bin/bash lfr_old_user
-mkdir -p /opt/lfr-extra
-printf 'old private data\n' >/root/lfr-private
-printf 'old home\n' >/home/lfr_old_user/private
-printf 'extra software\n' >/opt/lfr-extra/unwanted
-# Observe the actual production first-user body without altering it; only the test profile gets this wrapper.
-{
-cat <<'OBSERVER'
-#!/bin/bash
-set -euo pipefail
-exec > >(tee /dev/ttyS0) 2>&1
-if getent passwd lfr_old_user || test -e /home/lfr_old_user || test -e /root/lfr-private || test -e /opt/lfr-extra/unwanted; then
-    echo LFR_VM_OLD_DATA_SURVIVED; systemctl --no-block poweroff; exit 1
-fi
-cat >/run/lfr-qa-observer.sh <<'MONITOR'
-#!/bin/bash
-set -o pipefail
-    exec > >(tee /var/lib/lfr-qa-diagnostics /dev/ttyS0) 2>&1
-    for ((i=0;i<180;i++)); do
-        if test -f /var/lib/ubuntu-reset-firstboot-complete; then
-            id lfrqatest
-            passwd -S root
-            if test -e /etc/fedora-release && test "$(getenforce)" != Enforcing; then echo LFR_VM_SELINUX_FAIL; systemctl --no-block poweroff; exit 1; fi
-            # Check the locked field without relying on passwd implementation
-            # status formatting or printing password hashes into evidence.
-            root_locked=0
-            while IFS=: read -r account credential remainder; do
-                if [[ $account == root && $credential =~ ^[!*]+$ ]]; then root_locked=1; fi
-            done </etc/shadow
-            if getent passwd lfrqatest && id -nG lfrqatest | grep -Eq "(^| )(sudo|wheel)( |$)" && test "$root_locked" -eq 1 && printf "%s\n" qa7reset92factory | runuser -u lfrqatest -- sudo -S -k -p "" /usr/bin/id -u | grep -qx 0; then echo PASS >/var/lib/lfr-qa-result; sync; echo LFR_VM_RESTORE_PASS; else echo FAIL >/var/lib/lfr-qa-result; sync; echo LFR_VM_NEW_USER_FAIL; fi
-            systemctl --no-block poweroff; exit
-        fi
-        sleep 1
-    done
-    journalctl -b -u ubuntu-reset-firstboot.service --no-pager
-    echo LFR_VM_SETUP_TIMEOUT; systemctl --no-block poweroff; exit 1
-MONITOR
-observer_context=()
-if [[ -e /etc/fedora-release ]]; then observer_context=(--property=SELinuxContext=system_u:system_r:initrc_t:s0); fi
-systemd-run "${observer_context[@]}" --unit=lfr-qa-observer --property=StandardOutput=tty --property=TTYPath=/dev/ttyS0 --expand-environment=no /bin/bash /run/lfr-qa-observer.sh
-echo LFR_VM_AWAITING_NEW_USER
-OBSERVER
-sed '1d' /usr/lib/ubuntu-reset/firstboot.sh
-} >/tmp/lfr-observed-firstboot
-install -m 755 /tmp/lfr-observed-firstboot /usr/lib/ubuntu-reset/firstboot.sh
-if [[ $REC_MODE == automatic ]]; then
-    linux-factory-reset prepare-auto --storage /mnt/recovery
-else
-    linux-factory-reset prepare-image --file /mnt/recovery/pristine.raw --storage /mnt/recovery
-fi
-udevadm settle
-echo LFR_VM_READY_TO_ARM >/dev/ttyS0
-linux-factory-reset arm --confirm ERASE-ALL-USERS --reboot
-GUEST
+printf 'REC_UUID=%s\nREC_MODE=%s\nREC_DISTRO=%s\nREC_FAULT=%s\nREC_CYCLES=%s\nREC_GUI=%s\n' "$recovery_uuid" "$mode" "$distro" "$fault" "${RESET_CYCLES:-1}" "${GUI_ACCEPTANCE:-no}" >"$work/target/etc/lfr-qa.conf"
+cp tests/vm-guest.sh "$work/target/usr/local/sbin/lfr-qa"
 if [ "$arch" = arm64 ]; then sed -i s/ttyS0/ttyAMA0/g "$work/target/usr/local/sbin/lfr-qa"; fi
 chmod 755 "$work/target/usr/local/sbin/lfr-qa"
 cat >"$work/target/etc/systemd/system/lfr-qa.service" <<'UNIT'
@@ -230,4 +149,12 @@ for rescue in "$work/recovery/ubuntu-reset"/rescue-*; do
     test ! -e "$rescue/previous"; test ! -e "$rescue/active"
     test ! -e "$rescue/initrd"; test ! -e "$rescue/vmlinuz"
 done
+for cycle in $(seq 1 "${RESET_CYCLES:-1}"); do
+    if [ "$fault" = none ]; then
+        cp "$work/recovery/cycle-$cycle-result" "$evidence/cycle-$cycle-result.txt"
+        cp "$work/recovery/cycle-$cycle-diagnostics" "$evidence/cycle-$cycle-diagnostics.txt"
+        grep -qx PASS "$evidence/cycle-$cycle-result.txt"
+    fi
+done
+if [ -d "$work/recovery/gui-evidence" ]; then cp -a "$work/recovery/gui-evidence" "$evidence/"; fi
 echo 'Persistent restored-state verification passed.'

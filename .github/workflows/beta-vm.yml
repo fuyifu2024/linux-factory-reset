@@ -15,6 +15,14 @@ on:
         type: choice
         options: [none, failure, powercut]
         default: none
+      cycles:
+        type: choice
+        options: ['2', '1']
+        default: '2'
+      gui:
+        description: Real Zenity and polkit acceptance (Ubuntu AMD64)
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -47,7 +55,7 @@ jobs:
               cd build-native; cpack -G DEB'
           fi
       - name: Boot and restore an actual disposable VM
-        run: sudo env GITHUB_ACTIONS=true SOURCE_ARCH='${{ inputs.arch }}' VM_TIMEOUT_MINUTES=40 bash tests/engine-image.sh '${{ inputs.distro }}' '${{ inputs.fault }}'
+        run: sudo env GITHUB_ACTIONS=true SOURCE_ARCH='${{ inputs.arch }}' RESET_CYCLES='${{ inputs.cycles }}' GUI_ACCEPTANCE='${{ inputs.gui && 'yes' || 'no' }}' VM_TIMEOUT_MINUTES=50 bash tests/engine-image.sh '${{ inputs.distro }}' '${{ inputs.fault }}'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
