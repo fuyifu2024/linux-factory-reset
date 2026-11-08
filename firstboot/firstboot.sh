@@ -22,7 +22,15 @@ fi
 if ! getent passwd "$factory_user" >/dev/null; then
     useradd --create-home --shell /bin/bash "$factory_user"
 fi
-while ! passwd "$factory_user"; do echo 'Password setup failed; try again.'; done
+while :; do
+    if passwd "$factory_user"; then break; else factory_status=$?; fi
+    if [[ $factory_status -eq 126 || $factory_status -eq 127 ]]; then
+        echo 'Cannot execute the system password tool. Check the service log and SELinux policy.'
+        exit "$factory_status"
+    fi
+    echo 'Password setup failed; try again.'
+    sleep 1
+done
 factory_group=sudo
 if [[ -e /etc/fedora-release ]]; then factory_group=wheel; fi
 usermod --append --groups "$factory_group" "$factory_user"

@@ -172,6 +172,12 @@ static json reference(const fs::path& root, const fs::path& boot, const std::str
             auto mask = root / "etc/systemd/system/systemd-firstboot.service";
             need(fs::is_symlink(mask) && fs::read_symlink(mask) == "/dev/null", "旧恢复资料可能卡在系统首次设置。请用新版重新准备镜像。");
             validate_grub_roots(read(root / (os.at("id") == "fedora" ? "boot/grub2/grub.cfg" : "boot/grub/grub.cfg")));
+            if (os.at("id") == "fedora") {
+                auto context = root / "etc/systemd/system/ubuntu-reset-firstboot.service.d/selinux.conf";
+                require_inside(root, context);
+                need(fs::is_regular_file(context) && read(context).find("SELinuxContext=system_u:system_r:initrc_t:s0") != std::string::npos,
+                     "Fedora profile lacks its SELinux initial-account context; prepare it again");
+            }
         }
         auto fstab = read(root / "etc/fstab");
         need(fstab.find("@ROOT_UUID@") != std::string::npos && fstab.find("@BOOT_UUID@") != std::string::npos, "Profile fstab lacks relocation placeholders");
