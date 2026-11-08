@@ -1,0 +1,15 @@
+INCOMPLETE — NOT PASS
+Run: https://github.com/fuyifu2024/linux-factory-reset/actions/runs/42475225290
+Official source conversion was native ARM64; the guest imported a prepared profile.
+Starting TCG VM rescue config: MODULES=dep, gzip level 1; factory profile retained original configuration.
+Observed ordered milestones:
+LFR_VM_READY_TO_ARM
+Ubuntu Reset: verifying recovery media; do not remove power.
+Linux Factory Reset: saving temporary rollback copy.
+Ubuntu Reset: removing users/data and restoring initial system files.
+Ubuntu Reset complete. Restarting into initial setup.
+LFR_VM_AWAITING_NEW_USER
+Username / 用户名:
+New password:
+Retype new password:
+Result: initial-account setup timed out; sudo and final powered-off acceptance remain unverified.

@@ -4,6 +4,8 @@
 
 A C++20 official-image downloader and experimental Linux recovery tool, with small offline Shell components. Previously named `ubuntu-reset`; the old command remains compatible.
 
+**The Beta candidate is not released:** two successive GUI/CLI restores and interrupted-write rollback passed. ARM64 restored and booted into initial setup, but completed administrator creation and real sudo remain unverified. See the [candidate record](docs/validation/v0.5.0-beta.1.md).
+
 **v0.5 is an experimental preview for the systems and layouts listed in its acceptance record.** Actual AMD64 UEFI VMs running Ubuntu 26.04, Debian 13 and Fedora 45 have completed automatic restoration, old-account/file removal, new-administrator setup and real sudo checks. ARM64 has native build and source-conversion evidence, without guest-boot validation. Consult the exact evidence and fault-test scope.
 
 | Feature | Scope |

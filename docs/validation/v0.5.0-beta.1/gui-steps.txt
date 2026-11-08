@@ -1,0 +1,33 @@
+Waiting for main
+Waiting for result
+Unprepared preview guarded
+Waiting for main
+Waiting for source
+Waiting for result
+Waiting for directory
+Selected directory /mnt/recovery
+Waiting for result
+Waiting for directory
+Selected directory /home/lfr_old_user
+Waiting for result
+Authenticated real polkit prompt 1
+Official download and privileged image preparation completed
+Waiting for main
+Waiting for result
+Authenticated real polkit prompt 2
+Actual root/ESP preview completed
+Waiting for main
+Waiting for confirmation
+Waiting for wrong-confirmation return
+Wrong destructive confirmation rejected
+Waiting for marker armed
+Waiting for main
+Waiting for result
+Authenticated real polkit prompt 3
+Waiting for marker cancel-verified
+GUI cancelled an actual armed reset; root checked marker and BootOrder
+Waiting for main
+Waiting for confirmation
+Waiting for marker restore-armed
+Authenticated real polkit prompt 4
+Real GUI authenticated and armed confirmed reset/reboot

@@ -5,7 +5,19 @@ const [socketPath, logPath, fault = "none"] = process.argv.slice(2);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const deadline = Date.now() + Number(process.env.VM_TIMEOUT_MINUTES || 30) * 60 * 1000;
 const recoveryLimit = process.env.SOURCE_ARCH === 'arm64' ? 1800000 : 600000;
-let typed = false, armedAt = 0, setupAt = 0, setups = 0, phaseOffset = -1;
+let typed = false, armedAt = 0, setupAt = 0, setups = 0, phaseOffset = -1, inputStage = 0;
+async function typeLine(value) {
+  const socket = net.createConnection(socketPath);
+  await new Promise((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject); });
+  socket.on('data', () => {});
+  socket.write(JSON.stringify({execute:'qmp_capabilities'}) + '\n');
+  await delay(1000);
+  for (const key of [...value, 'ret']) {
+    socket.write(JSON.stringify({execute:'human-monitor-command',arguments:{'command-line':`sendkey ${key} 40`}})+'\n');
+    await delay(90);
+  }
+  socket.end();
+}
 while (Date.now() < deadline) {
   const log = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf8') : '';
   // TCG can spend minutes in each real phase. Reset the phase deadline only
@@ -23,7 +35,7 @@ while (Date.now() < deadline) {
   if (fault === 'powercut' && log.includes('LFR_VM_POWER_CUT_READY')) process.exit(42);
   if (log.includes('LFR_VM_ROLLBACK_PASS')) { await delay(4000); process.exit(0); }
   const seen = (log.match(/LFR_VM_AWAITING_NEW_USER/g) || []).length;
-  if (seen > setups) { setups = seen; typed = false; setupAt = 0; armedAt = Date.now(); }
+  if (seen > setups) { setups = seen; typed = false; setupAt = 0; inputStage = 0; armedAt = Date.now(); }
   if (!armedAt && log.includes('LFR_VM_READY_TO_ARM')) armedAt = Date.now();
   if (fault === 'none' && armedAt && !log.includes('LFR_VM_AWAITING_NEW_USER') && Date.now() - armedAt > recoveryLimit) throw Error('Recovery did not reach initial account setup within '+recoveryLimit/60000+' minutes; inspect serial evidence');
   if (setupAt && !(log.includes('LFR_VM_ACCOUNT_PASS '+setups) || log.includes('LFR_VM_RESTORE_PASS')) && Date.now() - setupAt > 190000) throw Error('Initial account setup did not complete; inspect serial evidence');
@@ -37,19 +49,17 @@ while (Date.now() < deadline) {
     const proc='/proc/'+process.env.VM_PID+'/stat';
     if (!fs.existsSync(proc) || /^\d+ \(.*\) Z /.test(fs.readFileSync(proc,'utf8'))) throw Error('QEMU exited before a verified result; inspect qemu.txt and serial evidence');
   }
-  if (!typed && log.includes('LFR_VM_AWAITING_NEW_USER')) {
-    typed = true; setupAt = Date.now();
-    const socket = net.createConnection(socketPath);
-    await new Promise((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject); });
-    socket.on('data', () => {});
-    socket.write(JSON.stringify({execute:'qmp_capabilities'}) + '\n');
-    await delay(1000);
-    const key = async value => { socket.write(JSON.stringify({execute:'human-monitor-command',arguments:{'command-line':`sendkey ${value}`}})+'\n'); await delay(90); };
-    for (const value of ['lfrqatest', 'qa7reset92factory', 'qa7reset92factory']) {
-      for (const char of value) await key(char);
-      await key('ret'); await delay(1000);
+  if (seen) {
+    const current = log.slice(log.lastIndexOf('LFR_VM_AWAITING_NEW_USER'));
+    const prompts = ['Username / 用户名:', 'New password:', 'Retype new password:'];
+    const values = ['lfrqatest', 'qa7reset92factory', 'qa7reset92factory'];
+    if (inputStage < prompts.length && current.includes(prompts[inputStage])) {
+      if (!typed) {typed = true; setupAt = Date.now();}
+      // passwd may discard bytes typed before its prompt. Never type the next
+      // field on a fixed delay, particularly under slow ARM system emulation.
+      await typeLine(values[inputStage]);
+      console.log('Entered first-user field '+(++inputStage)+' after its actual prompt.');
     }
-    socket.end();
   }
   await delay(1000);
 }
