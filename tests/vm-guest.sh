@@ -85,6 +85,14 @@ if [[ $REC_GUI == yes && $cycle -eq 1 ]]; then
             fi
             sleep 1
         done
+        for ((i=0;i<300;i++)); do
+            if [[ -e /mnt/recovery/gui-evidence/begin-restore && -f /var/lib/ubuntu-reset/request ]]; then
+                touch /mnt/recovery/gui-evidence/restore-armed
+                break
+            fi
+            sleep 1
+        done
+        test -f /mnt/recovery/gui-evidence/restore-armed
     ) &
     runuser -u lfr_old_user -- env DISPLAY=:99 GDK_BACKEND=x11 GSK_RENDERER=cairo LIBGL_ALWAYS_SOFTWARE=1 dbus-run-session -- bash -c '
         set -e

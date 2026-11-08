@@ -32,6 +32,11 @@ async function waitFor(predicate, label, timeout=120000) {
   log('Waiting for '+label);
   const end=Date.now()+timeout;while(Date.now()<end){await tick();const d=dialog();if(d&&predicate(d))return d;}throw Error('GUI timeout: '+label);
 }
+async function waitMarker(name) {
+  const end=Date.now()+300000;log('Waiting for marker '+name);
+  while(Date.now()<end){await tick();if(fs.existsSync(dir+'/'+name))return;}
+  throw Error('GUI root verification timed out: '+name);
+}
 async function keys(d, ...values) {run('xdotool',['windowactivate','--sync',d.w]);run('xdotool',['key','--clearmodifiers',...values]);await pause(400);}
 async function paste(d,value) {
   cp.execFileSync('xclip',['-selection','clipboard'],{input:value,stdio:['pipe','ignore','ignore'],timeout:15000});
@@ -69,13 +74,16 @@ try {
   await main(3);await confirm('wrong confirmation');
   await waitFor(d=>d.args.includes('--column=状态'),'wrong-confirmation return');log('Wrong destructive confirmation rejected');
   fs.writeFileSync(dir+'/request-arm','1');
-  while(!fs.existsSync(dir+'/armed'))await tick();
+  await waitMarker('armed');
   await main(4);await info('Pending reset cancelled');
   fs.writeFileSync(dir+'/request-check-cancel','1');
-  while(!fs.existsSync(dir+'/cancel-verified'))await tick();
+  await waitMarker('cancel-verified');
   log('GUI cancelled an actual armed reset; root checked marker and BootOrder');
   await main(3);fs.writeFileSync(dir+'/begin-restore','1');await confirm('清空全部用户');
-  log('Real GUI submitted confirmed reset/reboot');
+  // Final arm has its own real polkit prompt. Keep the agent driven until the
+  // privileged backend actually writes its request, rather than just typing OK.
+  await waitMarker('restore-armed');
+  log('Real GUI authenticated and armed confirmed reset/reboot');
   fs.writeFileSync(dir+'/gui-driver-complete','1');
 } catch(e) {
   log(e.stack);try{run('scrot',['--overwrite',dir+'/failure.png']);}catch{}
