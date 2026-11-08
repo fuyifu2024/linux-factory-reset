@@ -548,7 +548,7 @@ void plan(const json& s) {
     std::cout << "ROOT: this preview includes removal of all personal users and files.\n" << std::flush;
     run({"rsync", "-aHAXxnci", "--numeric-ids", "--delete", "--exclude=/dev/***", "--exclude=/proc/***", "--exclude=/sys/***", "--exclude=/run/***", "--exclude=/boot/firmware/***", "--exclude=/boot/efi/***", "--exclude=/var/lib/ubuntu-reset/***", str(source.temp.path / "root") + "/", "/"});
     auto boot = s["platform"] == "raspi-arm64" ? "/boot/firmware/" : "/boot/efi/";
-    std::cout << "BOOT:\n" << std::flush; run({"rsync", "-rtnci", "--delete", str(source.temp.path / "boot") + "/", boot});
+    std::cout << "BOOT:\n" << std::flush; run({"rsync", "-rtnci", "--delete", "--exclude=/EFI/LinuxFactoryReset/***", str(source.temp.path / "boot") + "/", boot});
     std::cout << "Preview only. UUID placeholders are replaced offline. Pending state is removed after successful restore.\n";
 }
 void arm(const json& s, const std::string& confirmation, bool reboot) {

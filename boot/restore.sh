@@ -47,6 +47,10 @@ uf_finish() {
         else
             echo 'Select the normal OS entry if firmware ignores BootOrder' >/dev/console
         fi
+        # A host-generated initramfs can contain host-specific configuration.
+        # Its independent copy is temporary and must not survive a completed reset.
+        rm -f "$UF_RESCUE/vmlinuz" "$UF_RESCUE/initrd" || return 1
+        sync
     fi
     return 0
 }
