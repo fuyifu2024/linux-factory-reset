@@ -1,4 +1,5 @@
 name: Actual Ubuntu and Fedora restore and rollback
+run-name: '${{ inputs.distro }} / ${{ inputs.fault }} · actual restore'
 on:
   workflow_dispatch:
     inputs:

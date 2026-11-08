@@ -197,5 +197,8 @@ fi
 # No temporary personal backup may remain after either successful outcome.
 recovery_loop=$(losetup --find --show --read-only "$work/recovery.raw")
 mount -t ext4 -o ro,noload "$recovery_loop" "$work/recovery"
-for rescue in "$work/recovery/ubuntu-reset"/rescue-*; do test ! -e "$rescue/previous"; test ! -e "$rescue/active"; done
+for rescue in "$work/recovery/ubuntu-reset"/rescue-*; do
+    test ! -e "$rescue/previous"; test ! -e "$rescue/active"
+    test ! -e "$rescue/initrd"; test ! -e "$rescue/vmlinuz"
+done
 echo 'Persistent restored-state verification passed.'
