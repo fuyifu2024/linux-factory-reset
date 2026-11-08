@@ -41,7 +41,7 @@ void install_rescue(const json& s, const fs::path& profile, const fs::path& init
     atomic_write(recovery / "grub.cfg", cfg);
     fs::create_directories(esp);
     auto target = s.at("platform") == "x86_64-uefi" ? "x86_64-efi" : "arm64-efi";
-    run({"grub-mkstandalone", "-O", target, "--modules=part_gpt part_msdos ext2 fat linux search search_fs_uuid normal configfile chain", "-o", (esp / loader).string(), "boot/grub/grub.cfg=" + (recovery / "grub.cfg").string()});
+    run({state_distro(s) == "fedora" ? "grub2-mkstandalone" : "grub-mkstandalone", "-O", target, "--modules=part_gpt part_msdos ext2 fat linux search search_fs_uuid normal configfile chain", "-o", (esp / loader).string(), "boot/grub/grub.cfg=" + (recovery / "grub.cfg").string()});
     auto bootdev = output({"findmnt", "-nro", "SOURCE", "/boot/efi"});
     auto disk = output({"lsblk", "-dnro", "PKNAME", bootdev}); auto number = read(fs::path("/sys/class/block") / fs::path(bootdev).filename() / "partition");
     while (!number.empty() && number.back() == '\n') number.pop_back();
@@ -55,6 +55,7 @@ void install_rescue(const json& s, const fs::path& profile, const fs::path& init
     need(std::regex_match(entry, std::regex("[0-9A-Fa-f]{4}")), "Rescue entry was not created");
     atomic_write(recovery / "entry", entry + "\n");
     // Activate only after kernel, initrd, loader and metadata have reached storage.
+    atomic_write(REQUEST, id + "\n");
     atomic_write(recovery / "active", id + "\n"); sync();
     run({"efibootmgr", "--bootorder", entry + "," + order});
 }

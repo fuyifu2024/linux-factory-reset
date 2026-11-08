@@ -49,6 +49,23 @@ uf_rollback() {
     reboot -f
     return 1
 }
+uf_commit() {
+    # A durable commit decision precedes deletion of the temporary personal backup.
+    # An interrupted cleanup resumes cleanup, never a half-deleted rollback copy.
+    UF_WRITING=0
+    if [ "$UF_PLATFORM" != raspi-arm64 ]; then
+        printf 'COMMITTED\n' >"$UF_RESCUE/phase" || return 1
+        sync
+        rm -rf "$UF_RESCUE/previous" "$UF_RESCUE/backup-ready" || return 1
+        sync
+    fi
+    uf_finish RESTORED || return 1
+    sync
+    umount /run/uf-boot || return 1
+    mount -t ext4 -o remount,ro "$UF_ROOT_DEV" "$UF_TARGET" || return 1
+    reboot -f
+    return 1
+}
 uf_fail() {
     echo "Linux Factory Reset STOPPED: $*" >/dev/console
     if [ "$UF_WRITING" -eq 1 ] && [ "$UF_PLATFORM" != raspi-arm64 ]; then
@@ -104,6 +121,9 @@ if [ "$UF_PLATFORM" != raspi-arm64 ]; then
     [ "$(cat "$UF_RESCUE/active")" = "$UF_ID" ] || uf_fail 'Recovery transaction is not active'
 fi
 mount -t vfat -o iocharset=ascii,utf8=1,codepage=437 "$UF_BOOT_DEV" /run/uf-boot || uf_fail 'Cannot mount boot partition'
+if [ -f "$UF_RESCUE/phase" ] && [ "$(cat "$UF_RESCUE/phase")" = COMMITTED ]; then
+    uf_commit || uf_fail 'Cannot complete committed recovery cleanup'
+fi
 if [ -f "$UF_RESCUE/phase" ] && [ "$(cat "$UF_RESCUE/phase")" = WRITING ]; then
     UF_WRITING=1
     uf_rollback || uf_fail 'Interrupted restoration could not be rolled back'
@@ -161,13 +181,5 @@ echo 'Ubuntu Reset: removing users/data and restoring initial system files.' >/d
 uf_reconcile /run/uf-source/root "$UF_TARGET" /run/uf-source/boot /run/uf-boot || uf_fail 'Filesystem restore failed'
 uf_relocate "$UF_PLATFORM" "$UF_DISTRO" "$UF_TARGET" /run/uf-boot "$UF_ROOT" "$UF_BOOT" || uf_fail 'Cannot relocate root/EFI boot pointers'
 sync
-uf_finish RESTORED || uf_fail 'Cannot finalize recovery'
-if [ "$UF_PLATFORM" != raspi-arm64 ]; then
-    rm -rf "$UF_RESCUE/previous" "$UF_RESCUE/backup-ready" || uf_fail 'Cannot remove previous personal data'
-fi
-sync
-umount /run/uf-boot || uf_fail 'Cannot flush boot filesystem'
-mount -t ext4 -o remount,ro "$UF_ROOT_DEV" "$UF_TARGET" || uf_fail 'Cannot flush root filesystem'
 echo 'Ubuntu Reset complete. Restarting into initial setup.' >/dev/console
-reboot -f
-uf_fail 'Automatic reboot failed; restart manually'
+uf_commit || uf_fail 'Cannot finalize recovery; use independent rescue to finish cleanup'

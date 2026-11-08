@@ -542,7 +542,7 @@ void arm(const json& s, const std::string& confirmation, bool reboot) {
          && contents.find("usr/lib/ubuntu-reset/relocate.sh") != std::string::npos, "Recovery files are absent from initramfs");
     for (const auto& tool : {"awk", "grep", "sed", "rsync", "sha256sum", "readlink", "sync"})
         need(contents.find(std::string("usr/bin/") + tool) != std::string::npos, "Recovery utility missing from initramfs: " + std::string(tool));
-    need(contents.find("usr/sbin/losetup") != std::string::npos, "Read-only loop utility is absent from initramfs");
+    need(contents.find("/losetup") != std::string::npos, "Read-only loop utility is absent from initramfs");
     if (s["platform"] == "raspi-arm64") {
         auto config = read("/boot/firmware/config.txt");
         need(stock_pi_boot(config), "Unsupported/ambiguous Pi boot recipe");
