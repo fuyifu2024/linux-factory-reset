@@ -4,7 +4,7 @@ import cp from 'node:child_process';
 const [guiPid, dir] = process.argv.slice(2);
 const pause = ms => new Promise(r => setTimeout(r, ms));
 const run = (cmd,args) => cp.execFileSync(cmd,args,{encoding:'utf8',timeout:15000}).trim();
-const log = message => fs.appendFileSync(dir+'/steps.txt',message+'\n');
+const log = message => {fs.appendFileSync(dir+'/steps.txt',message+'\n');console.log('GUI QA: '+message);};
 let auths=0, shotAt=0;
 function dialog() {
   let pids=[]; try { pids=run('pgrep',['-u',String(process.getuid()),'-x','zenity']).split('\n'); } catch {}
@@ -29,6 +29,7 @@ async function tick() {
   await pause(250);
 }
 async function waitFor(predicate, label, timeout=120000) {
+  log('Waiting for '+label);
   const end=Date.now()+timeout;while(Date.now()<end){await tick();const d=dialog();if(d&&predicate(d))return d;}throw Error('GUI timeout: '+label);
 }
 async function keys(d, ...values) {run('xdotool',['windowactivate','--sync',d.w]);run('xdotool',['key','--clearmodifiers',...values]);await pause(400);}

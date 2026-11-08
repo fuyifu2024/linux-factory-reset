@@ -17,6 +17,7 @@ while (Date.now() < deadline) {
   if (/ALERT!.*does not exist|Ubuntu Reset STOPPED|Kernel panic - not syncing|grub rescue>|Entering emergency mode|No bootable device/.test(log)) throw Error('Guest boot/recovery halted; inspect serial evidence');
   if (/Linux Factory Reset STOPPED: (?!expected QA write failure)/.test(log)) throw Error('Recovery refused to proceed; inspect serial evidence');
   if (/LFR_VM_(?:PREPARATION_FAIL|OLD_DATA_SURVIVED|NEW_USER_FAIL|SETUP_TIMEOUT|SELINUX_FAIL)/.test(log)) throw Error('Real VM reported a failed recovery; inspect serial evidence');
+  if (/Failed to start .*lfr-qa\.service/.test(log)) throw Error('Disposable guest preparation service failed; inspect serial evidence');
   if (typed && log.includes('reboot: Power down')) { console.log('Guest powered off; the host must verify its synced result and restored filesystem.'); process.exit(0); }
   if (log.includes('LFR_VM_ALL_CYCLES_COMPLETE') || log.includes('LFR_VM_RESTORE_PASS')) { await delay(5000); console.log('Real UEFI VM restored, removed old users/data and created a new sudo administrator.'); process.exit(0); }
   if (process.env.VM_PID) {
