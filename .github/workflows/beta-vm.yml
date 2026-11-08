@@ -75,6 +75,13 @@ jobs:
         with:
           name: progress-2-${{ inputs.distro }}-${{ inputs.arch }}-${{ inputs.fault }}
           path: evidence/
+      - name: Restoration checkpoint
+        run: for i in $(seq 1 30); do test ! -f evidence/test-exit || break; sleep 10; done
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: progress-3-${{ inputs.distro }}-${{ inputs.arch }}-${{ inputs.fault }}
+          path: evidence/
       - name: Await and verify actual VM result
         run: |
           for i in $(seq 1 900); do
