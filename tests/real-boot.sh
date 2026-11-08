@@ -76,6 +76,9 @@ printf 'REC_UUID=%s\nREC_MODE=%s\nREC_DISTRO=%s\nREC_FAULT=%s\nREC_CYCLES=%s\nRE
 cp tests/vm-guest.sh "$work/target/usr/local/sbin/lfr-qa"
 if [ "$arch" = arm64 ]; then sed -i s/ttyS0/ttyAMA0/g "$work/target/usr/local/sbin/lfr-qa"; fi
 chmod 755 "$work/target/usr/local/sbin/lfr-qa"
+cp "$work/target/etc/fstab" "$evidence/starting-fstab.txt"
+if [ "$distro" = fedora ]; then cp "$work/target/boot/grub2/grub.cfg" "$evidence/starting-grub.txt"; else cp "$work/target/boot/grub/grub.cfg" "$evidence/starting-grub.txt"; fi
+blkid -p "$target_boot" >"$evidence/starting-esp.txt"
 cat >"$work/target/etc/systemd/system/lfr-qa.service" <<'UNIT'
 [Unit]
 Description=Disposable CI VM reset driver

@@ -54,8 +54,37 @@ jobs:
               ctest --test-dir build-native --output-on-failure
               cd build-native; cpack -G DEB'
           fi
-      - name: Boot and restore an actual disposable VM
-        run: sudo env GITHUB_ACTIONS=true SOURCE_ARCH='${{ inputs.arch }}' RESET_CYCLES='${{ inputs.cycles }}' GUI_ACCEPTANCE='${{ inputs.gui && 'yes' || 'no' }}' VM_TIMEOUT_MINUTES=150 bash tests/engine-image.sh '${{ inputs.distro }}' '${{ inputs.fault }}'
+      - name: Start actual disposable VM acceptance
+        run: |
+          mkdir -p evidence
+          nohup sudo env GITHUB_ACTIONS=true SOURCE_ARCH='${{ inputs.arch }}' RESET_CYCLES='${{ inputs.cycles }}' GUI_ACCEPTANCE='${{ inputs.gui && 'yes' || 'no' }}' VM_TIMEOUT_MINUTES=150 bash -c '
+            bash tests/engine-image.sh "$1" "$2"
+            echo "$?" > evidence/test-exit
+          ' bash '${{ inputs.distro }}' '${{ inputs.fault }}' > evidence/host.txt 2>&1 < /dev/null &
+      - name: First running checkpoint
+        run: for i in $(seq 1 18); do test ! -f evidence/test-exit || break; sleep 10; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: progress-1-${{ inputs.distro }}-${{ inputs.arch }}-${{ inputs.fault }}
+          path: evidence/
+      - name: Second running checkpoint
+        run: for i in $(seq 1 18); do test ! -f evidence/test-exit || break; sleep 10; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: progress-2-${{ inputs.distro }}-${{ inputs.arch }}-${{ inputs.fault }}
+          path: evidence/
+      - name: Await and verify actual VM result
+        run: |
+          for i in $(seq 1 900); do
+            if test -f evidence/test-exit; then
+              tail -40 evidence/host.txt
+              test "$(cat evidence/test-exit)" = 0
+              exit "$?"
+            fi
+            sleep 10
+          done
+          echo 'Acceptance did not complete; inspect running checkpoints and final evidence.'
+          exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
