@@ -12,6 +12,12 @@ case " $(cat /proc/cmdline) " in *" lfr.rescue=$UF_ID "*) UF_RESCUE_MODE=1 ;; es
 if [ "$UF_RESCUE_MODE" -eq 0 ] && [ ! -e "$UF_TARGET/var/lib/ubuntu-reset/request" ]; then exit 0; fi
 UF_WRITING=0
 
+uf_phase() {
+    printf '%s\n' "$1" >"$UF_RESCUE/phase.new" || return 1
+    sync
+    mv "$UF_RESCUE/phase.new" "$UF_RESCUE/phase" || return 1
+    sync
+}
 uf_normal_order() {
     [ -f "$UF_RESCUE/original-order" ] || return 0
     uf_order=$(cat "$UF_RESCUE/original-order") || return 1
@@ -62,8 +68,7 @@ uf_commit() {
     # An interrupted cleanup resumes cleanup, never a half-deleted rollback copy.
     UF_WRITING=0
     if [ "$UF_PLATFORM" != raspi-arm64 ]; then
-        printf 'COMMITTED\n' >"$UF_RESCUE/phase" || return 1
-        sync
+        uf_phase COMMITTED || return 1
         rm -rf "$UF_RESCUE/previous" "$UF_RESCUE/backup-ready" || return 1
         sync
     fi
@@ -178,8 +183,7 @@ if [ "$UF_PLATFORM" != raspi-arm64 ]; then
     sync
     printf 'READY\n' >"$UF_RESCUE/backup-ready" || uf_fail 'Cannot seal backup'
     sync
-    printf 'WRITING\n' >"$UF_RESCUE/phase" || uf_fail 'Cannot record transaction phase'
-    sync
+    uf_phase WRITING || uf_fail 'Cannot record transaction phase'
 fi
 UF_WRITING=1
 mount -t ext4 -o remount,rw "$UF_ROOT_DEV" "$UF_TARGET" || uf_fail 'Cannot make target writable'
