@@ -109,10 +109,19 @@ fi
 observer_context=()
 if [[ -e /etc/fedora-release ]]; then observer_context=(--property=SELinuxContext=system_u:system_r:initrc_t:s0); fi
 systemd-run "${observer_context[@]}" --unit=lfr-qa-observer --property=StandardOutput=tty --property=TTYPath=/dev/ttyS0 /bin/bash -c '
+    exec > >(tee /var/lib/lfr-qa-diagnostics /dev/ttyS0) 2>&1
     for ((i=0;i<180;i++)); do
         if test -f /var/lib/ubuntu-reset-firstboot-complete; then
+            id lfrqatest
+            passwd -S root
             if test -e /etc/fedora-release && test "$(getenforce)" != Enforcing; then echo LFR_VM_SELINUX_FAIL; systemctl --no-block poweroff; exit 1; fi
-            if getent passwd lfrqatest && id -nG lfrqatest | grep -Eq "(^| )(sudo|wheel)( |$)" && passwd -S root | grep -q " L " && printf "%s\n" qa7reset92factory | runuser -u lfrqatest -- sudo -S -k -p "" /usr/bin/id -u | grep -qx 0; then echo PASS >/var/lib/lfr-qa-result; sync; echo LFR_VM_RESTORE_PASS; else echo FAIL >/var/lib/lfr-qa-result; sync; echo LFR_VM_NEW_USER_FAIL; fi
+            # Debian reports L, Fedora reports LK. Check the actual locked field
+            # without ever printing password hashes into evidence.
+            root_locked=0
+            while IFS=: read -r account credential remainder; do
+                if [[ $account == root && $credential =~ ^[!*]+$ ]]; then root_locked=1; fi
+            done </etc/shadow
+            if getent passwd lfrqatest && id -nG lfrqatest | grep -Eq "(^| )(sudo|wheel)( |$)" && test "$root_locked" -eq 1 && printf "%s\n" qa7reset92factory | runuser -u lfrqatest -- sudo -S -k -p "" /usr/bin/id -u | grep -qx 0; then echo PASS >/var/lib/lfr-qa-result; sync; echo LFR_VM_RESTORE_PASS; else echo FAIL >/var/lib/lfr-qa-result; sync; echo LFR_VM_NEW_USER_FAIL; fi
             systemctl --no-block poweroff; exit
         fi
         sleep 1
@@ -185,6 +194,7 @@ udevadm settle
 target_root=$(lsblk -nrpo PATH,FSTYPE "$target_loop" | awk '$2 == "ext4" {print $1}')
 mount -t ext4 -o ro,noload "$target_root" "$work/target"
 cp "$work/target/var/lib/lfr-qa-result" "$evidence/guest-result.txt"
+if [ -f "$work/target/var/lib/lfr-qa-diagnostics" ]; then cp "$work/target/var/lib/lfr-qa-diagnostics" "$evidence/guest-diagnostics.txt"; fi
 grep -qx PASS "$evidence/guest-result.txt"
 if [ "$fault" = none ]; then
 grep -q '^lfrqatest:' "$work/target/etc/passwd"
