@@ -87,12 +87,13 @@ if [[ $REC_GUI == yes && $cycle -eq 1 ]]; then
         done
     ) &
     runuser -u lfr_old_user -- env DISPLAY=:99 GDK_BACKEND=x11 GSK_RENDERER=cairo LIBGL_ALWAYS_SOFTWARE=1 dbus-run-session -- bash -c '
+        set -e
         openbox >/mnt/recovery/gui-evidence/openbox.txt 2>&1 &
         /usr/bin/linux-factory-reset gui >/mnt/recovery/gui-evidence/gui.txt 2>&1 &
         gui_pid=$!
         xterm -fa monospace -fs 11 -T "LFR authorization" -e script -q -f /mnt/recovery/gui-evidence/auth.txt -c "pkttyagent --process $gui_pid" &
         node /mnt/recovery/drive-gui.mjs "$gui_pid" /mnt/recovery/gui-evidence /mnt/recovery/GUI-ARM-NOW
-        wait "$gui_pid"' || [[ -e /mnt/recovery/gui-evidence/begin-restore ]]
+        wait "$gui_pid"' || [[ -e /mnt/recovery/gui-evidence/gui-driver-complete ]]
     exit 0
 fi
 if [[ $REC_MODE == automatic ]]; then

@@ -70,7 +70,7 @@ try {
   log('GUI cancelled an actual armed reset; root checked marker and BootOrder');
   await main(3);fs.writeFileSync(dir+'/begin-restore','1');await confirm('清空全部用户');
   log('Real GUI submitted confirmed reset/reboot');
-  for(let i=0;i<100;i++)await tick();
+  fs.writeFileSync(dir+'/gui-driver-complete','1');
 } catch(e) {
   log(e.stack);try{run('scrot',['--overwrite',dir+'/failure.png']);}catch{}
   const d=dialog();if(d)log('Remaining real dialog: '+JSON.stringify(d.args));
