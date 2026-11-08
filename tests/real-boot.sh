@@ -86,7 +86,7 @@ Type=oneshot
 ExecStart=/usr/local/sbin/lfr-qa
 StandardOutput=journal+console
 StandardError=journal+console
-TimeoutStartSec=900
+TimeoutStartSec=5400
 [Install]
 WantedBy=multi-user.target
 UNIT
@@ -97,7 +97,7 @@ losetup --detach "$target_loop"; target_loop=''
 if [ "$arch" = arm64 ]; then cp /usr/share/AAVMF/AAVMF_VARS.fd "$work/vars.fd"; else cp /usr/share/OVMF/OVMF_VARS_4M.fd "$work/vars.fd"; fi
 start_vm() {
 if [ "$arch" = arm64 ]; then
-    accel=tcg; cpu=max
+    accel=tcg; cpu=cortex-a72
     if [ -c /dev/kvm ]; then accel=kvm; cpu=host; fi
     set -- qemu-system-aarch64 -machine "virt,accel=$accel,gic-version=3" -cpu "$cpu" -device virtio-gpu-pci -device qemu-xhci -device usb-kbd
     code=/usr/share/AAVMF/AAVMF_CODE.fd

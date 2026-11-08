@@ -10,6 +10,7 @@ evidence=$PWD/evidence
 work=$(mktemp -d /var/lib/lfr-engine.XXXXXX)
 loop=''
 cleanup() {
+    umount "$work/root/proc" 2>/dev/null || :
     umount "$work/root" 2>/dev/null || :
     umount "$work/esp" 2>/dev/null || :
     [[ -z $loop ]] || losetup -d "$loop" || :
@@ -53,6 +54,28 @@ mount "${loop}p2" "$work/root"; mount "${loop}p1" "$work/esp"
 unsquashfs -no-progress -d "$work/profile" "$work/factory.squashfs"
 rsync -aHAX "$work/profile/root/" "$work/root/"
 rsync -rt "$work/profile/boot/" "$work/esp/"
+# Native ARM runners currently use TCG for the guest. Install the QA tool's
+# dependencies natively into only the disposable starting disk, before boot.
+# The pristine recovery profile above remains untouched.
+if [[ $source_arch == arm64 ]]; then
+    [[ $(uname -m) == aarch64 ]] || exit 1
+    cp --remove-destination /etc/resolv.conf "$work/root/etc/resolv.conf"
+    for node in null zero random urandom; do
+        case "$node" in null) minor=3 ;; zero) minor=5 ;; random) minor=8 ;; urandom) minor=9 ;; esac
+        [[ -e $work/root/dev/$node ]] || mknod -m 666 "$work/root/dev/$node" c 1 "$minor"
+    done
+    mount -t proc proc "$work/root/proc"
+    if [[ $distro == fedora ]]; then
+        cp "$package" "$work/root/tmp/lfr-qa-package.rpm"
+        chroot "$work/root" /usr/bin/dnf install -y /tmp/lfr-qa-package.rpm
+    else
+        cp "$package" "$work/root/tmp/lfr-qa-package.deb"
+        chroot "$work/root" /usr/bin/apt-get update
+        DEBIAN_FRONTEND=noninteractive chroot "$work/root" /usr/bin/apt-get install -y --no-install-recommends /tmp/lfr-qa-package.deb
+    fi
+    umount "$work/root/proc"
+    touch "$work/root/etc/lfr-qa-preinstalled"
+fi
 . boot/relocate.sh
 uf_relocate "$platform" "$distro" "$work/root" "$work/esp" "$root_uuid" "$boot_uuid"
 # Only the starting QA guest skips the account wizard. Its recovery profile uses it normally.

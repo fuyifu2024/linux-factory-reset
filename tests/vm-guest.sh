@@ -19,7 +19,9 @@ fi
 cycle=0; [[ ! -f /mnt/recovery/qa-cycle ]] || read -r cycle </mnt/recovery/qa-cycle
 cycle=$((cycle+1)); echo "$cycle" >/mnt/recovery/qa-cycle
 printf 'LFR_VM_CYCLE_START %s\n' "$cycle" >/dev/console
-if [[ $REC_DISTRO == fedora ]]; then
+if [[ -f /etc/lfr-qa-preinstalled ]]; then
+    linux-factory-reset --version
+elif [[ $REC_DISTRO == fedora ]]; then
     dnf install -y /mnt/recovery/tool.rpm
 else
     apt-get update
@@ -99,7 +101,11 @@ else
     linux-factory-reset prepare-image --file /mnt/recovery/pristine.raw --storage /mnt/recovery
 fi
 original_order=$(efibootmgr | sed -n 's/^BootOrder: //p')
-for attempt in 1 2; do
+attempts=2
+# Repeated arm/cancel and corrupt-profile rejection run on the KVM suite.
+# ARM TCG retains the actual destructive arm, rescue, restore and user setup.
+if [[ $(uname -m) == aarch64 ]]; then attempts=0; fi
+for ((attempt=0;attempt<attempts;attempt++)); do
     linux-factory-reset arm --confirm ERASE-ALL-USERS
     test -f /var/lib/ubuntu-reset/request
     linux-factory-reset cancel
@@ -108,6 +114,7 @@ for attempt in 1 2; do
     test "$(efibootmgr | sed -n 's/^BootOrder: //p')" = "$original_order"
 done
 # Corrupt only the selected current profile, then restore its original bytes by truncation.
+if (( attempts > 0 )); then
 profile=$(sed -n 's/.*"file": "\([^" ]*\)".*/\1/p' /etc/ubuntu-reset/state.json)
 profile=/mnt/recovery/$profile
 size=$(stat -c %s "$profile")
@@ -115,6 +122,7 @@ printf BAD >>"$profile"
 if linux-factory-reset arm --confirm ERASE-ALL-USERS; then exit 91; fi
 test ! -e /var/lib/ubuntu-reset/request
 truncate -s "$size" "$profile"
+fi
 udevadm settle
 echo LFR_VM_READY_TO_ARM >/dev/console
 linux-factory-reset arm --confirm ERASE-ALL-USERS --reboot
