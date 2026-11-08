@@ -1,0 +1,17 @@
+name: Inspect official Ubuntu and Fedora source layouts
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y qemu-utils btrfs-progs
+      - run: sudo env GITHUB_ACTIONS=true bash tests/source-layouts.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: source-layouts
+          path: evidence/
