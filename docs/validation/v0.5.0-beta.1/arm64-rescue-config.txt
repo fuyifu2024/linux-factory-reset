@@ -1,0 +1,2 @@
+Starting TCG guest uses MODULES=dep and gzip level 1 for real rescue generation.
+The pristine factory profile retains its original initramfs configuration.

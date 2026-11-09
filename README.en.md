@@ -6,7 +6,7 @@ A C++20 official-image downloader and experimental Linux recovery tool, with sma
 
 **v0.5.0-beta.1 public testing:** follow the [testing guide](docs/beta-testing.md) in a disposable VM and report bugs or suggestions. Completed checks and remaining validation gaps are listed separately below.
 
-Ubuntu 26.04 AMD64 completed the real GUI flow, two successive restorations, new-administrator/sudo checks and interrupted-write rollback. Debian 13 and Fedora 45 AMD64 restoration baselines are linked in the evidence. **Ubuntu 26.04 ARM64 restored and booted into initial setup, but completed account creation and real sudo remain unverified; the corrected keyboard driver has not been rerun.** Consult the record for other combinations and physical-hardware limits.
+Ubuntu 26.04 AMD64 completed the real GUI flow, two successive restorations, new-administrator/sudo checks and interrupted-write rollback. Debian 13 and Fedora 45 AMD64 restoration baselines are linked in the evidence. **On 2026-11-09, Ubuntu 26.04 ARM64 UEFI also completed actual restoration, reboot, new-administrator creation, password-authenticated sudo and powered-off disk/temporary-backup checks.** Consult the record for other combinations and physical-hardware limits.
 
 | Feature | Scope |
 | --- | --- |

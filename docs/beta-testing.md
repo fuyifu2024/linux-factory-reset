@@ -1,6 +1,6 @@
 # Beta public testing / Beta 公测
 
-**Known validation gaps / 当前验收缺口：** Ubuntu 26.04 ARM64 restored and booted, but completed first-user setup and sudo remain unverified; Fedora ARM64 guest-boot acceptance has not passed. Ubuntu 26.04 ARM64 已恢复并开机，首次开户完成及 sudo 仍未验收；Fedora ARM64 启动验收尚未通过。具体范围见 [验证记录](validation/v0.5.0-beta.1.md)。
+**Validation update / 验收更新（2026-11-09）：** Ubuntu 26.04 ARM64 UEFI now passed restoration, reboot, first-user creation and real sudo, on the published Beta tag. Ubuntu 26.04 ARM64 UEFI 已在发布标签上通过恢复、重启、首次开户与实际 sudo 验证。Fedora ARM64 guest-boot acceptance and physical hardware remain unverified / Fedora ARM64 启动及物理硬件仍未通过验收。具体方法和范围见 [验证记录](validation/v0.5.0-beta.1.md)。
 
 [中文](#中文) · [English](#english) · [Releases](https://github.com/fuyifu2024/linux-factory-reset/releases) · [Report a bug / 反馈问题](https://github.com/fuyifu2024/linux-factory-reset/issues/new?template=bug.yml)
 
