@@ -1,0 +1,98 @@
+[
+  {
+    "binary": "linux-factory-reset-debian12-linux-amd64",
+    "machine": 62,
+    ".text": "b476bcd1c46c94c08116d42f69021c2b6f85edeef462c7a44e15578da38493af",
+    ".rodata": "393ca4766eda6930005fa3acc8fa6a8e2208fa8c30bac08cb6d4548fb1d4a6f2"
+  },
+  {
+    "binary": "linux-factory-reset-debian12-linux-arm64",
+    "machine": 183,
+    ".text": "e611707f9cf3cb221f96c502e92e34c22b4f5ffe8c25b3160dcde427120ece8d",
+    ".rodata": "52cc986d4d3f844e6de085cf891740b6473a1f9155fd8fa310b19b8602562ff8"
+  },
+  {
+    "binary": "linux-factory-reset-debian13-linux-amd64",
+    "machine": 62,
+    ".text": "f6ddb8e5cef2cd481745374ef05761054b74157b402c5a5169ba5248d7301212",
+    ".rodata": "d9cc0634c20cd87390ca82dd8c6fca3e36a01beb2127f0c2a7ee4516d52e93b7"
+  },
+  {
+    "binary": "linux-factory-reset-debian13-linux-arm64",
+    "machine": 183,
+    ".text": "ecbd96438c1ba2138b9257b6472a4dffa12063b2d2609e30aee1148880f8a752",
+    ".rodata": "24c7c4990e87daeccfee96da5cf97810b2758d1f9f766d9259ba0d894e3bdb54"
+  },
+  {
+    "binary": "linux-factory-reset-fedora45-linux-aarch64",
+    "machine": 183,
+    ".text": "caebabff3c87a761430f4d52295ef68ef48a6f54f17fdb383da3b3587fc18411",
+    ".rodata": "bc9d2f0246dcb04022569b52343f94c0e199736fdbefd4e43a0cf092496c9e75"
+  },
+  {
+    "binary": "linux-factory-reset-fedora45-linux-x86_64",
+    "machine": 62,
+    ".rodata": "d239e9a3b172c4a3ba374ff4da5ebfc02e786f44a4401086debe56d008f8fb04",
+    ".text": "aab3fe7fdff171f9e07aeeada1190ce524b443d1858b0ed966f719c561ab6742"
+  },
+  {
+    "binary": "linux-factory-reset-ubuntu24.04-linux-amd64",
+    "machine": 62,
+    ".text": "27bbae20b18be61294562131aa0d613839e0f48bad4d8916b4261f3089d14f1e",
+    ".rodata": "e00392aa89217cc9ce86e8c64d697a4ef14de5e632c3114fdc267336311f1f24"
+  },
+  {
+    "binary": "linux-factory-reset-ubuntu24.04-linux-arm64",
+    "machine": 183,
+    ".text": "6a34a15f455eb48a4dac08496aba56ef580a51d4efbbe42b65cb4480306b4976",
+    ".rodata": "ccb0d77ea2dc996a5a401521a219b4aceda2d651aae503204529be4525349226"
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.2_debian12_amd64.deb",
+    "version": "0.5.0~beta2",
+    "matches": "linux-factory-reset-debian12-linux-amd64",
+    "machine": 62,
+    ".text": "b476bcd1c46c94c08116d42f69021c2b6f85edeef462c7a44e15578da38493af",
+    ".rodata": "393ca4766eda6930005fa3acc8fa6a8e2208fa8c30bac08cb6d4548fb1d4a6f2"
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.2_debian12_arm64.deb",
+    "version": "0.5.0~beta2",
+    "matches": "linux-factory-reset-debian12-linux-arm64",
+    "machine": 183,
+    ".text": "e611707f9cf3cb221f96c502e92e34c22b4f5ffe8c25b3160dcde427120ece8d",
+    ".rodata": "52cc986d4d3f844e6de085cf891740b6473a1f9155fd8fa310b19b8602562ff8"
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.2_debian13_amd64.deb",
+    "version": "0.5.0~beta2",
+    "matches": "linux-factory-reset-debian13-linux-amd64",
+    "machine": 62,
+    ".text": "f6ddb8e5cef2cd481745374ef05761054b74157b402c5a5169ba5248d7301212",
+    ".rodata": "d9cc0634c20cd87390ca82dd8c6fca3e36a01beb2127f0c2a7ee4516d52e93b7"
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.2_debian13_arm64.deb",
+    "version": "0.5.0~beta2",
+    "matches": "linux-factory-reset-debian13-linux-arm64",
+    "machine": 183,
+    ".text": "ecbd96438c1ba2138b9257b6472a4dffa12063b2d2609e30aee1148880f8a752",
+    ".rodata": "24c7c4990e87daeccfee96da5cf97810b2758d1f9f766d9259ba0d894e3bdb54"
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.2_ubuntu24.04_amd64.deb",
+    "version": "0.5.0~beta2",
+    "matches": "linux-factory-reset-ubuntu24.04-linux-amd64",
+    "machine": 62,
+    ".text": "27bbae20b18be61294562131aa0d613839e0f48bad4d8916b4261f3089d14f1e",
+    ".rodata": "e00392aa89217cc9ce86e8c64d697a4ef14de5e632c3114fdc267336311f1f24"
+  },
+  {
+    "package": "linux-factory-reset_0.5.0-beta.2_ubuntu24.04_arm64.deb",
+    "version": "0.5.0~beta2",
+    "matches": "linux-factory-reset-ubuntu24.04-linux-arm64",
+    "machine": 183,
+    ".text": "6a34a15f455eb48a4dac08496aba56ef580a51d4efbbe42b65cb4480306b4976",
+    ".rodata": "ccb0d77ea2dc996a5a401521a219b4aceda2d651aae503204529be4525349226"
+  }
+]
