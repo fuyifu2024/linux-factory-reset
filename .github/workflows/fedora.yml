@@ -24,11 +24,13 @@ jobs:
           linux-factory-reset status
           test -x /usr/lib/dracut/modules.d/95linux-factory-reset/module-setup.sh
           test ! -e /var/lib/ubuntu-reset/request
+      - name: Diagnose inaccessible state as an ordinary user
+        run: sh tests/diagnostics.sh /usr/bin/linux-factory-reset
       - name: Collect release artifacts
         run: |
           TASK_ARCH=$(rpm --eval '%{_arch}')
           mkdir -p build/release
-          cp build/*.rpm "build/release/linux-factory-reset_0.5.0-beta.1_fedora45_${TASK_ARCH}.rpm"
+          cp build/*.rpm "build/release/linux-factory-reset_0.5.0-beta.2_fedora45_${TASK_ARCH}.rpm"
           cp build/linux-factory-reset "build/release/linux-factory-reset-fedora45-linux-${TASK_ARCH}"
           strip "build/release/linux-factory-reset-fedora45-linux-${TASK_ARCH}"
           cd build/release

@@ -1,10 +1,10 @@
 # Linux Factory Reset
 
-[中文](README.md) · [Download Beta](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-beta.1) · [Validation evidence](docs/validation/v0.5.0-beta.1.md) · [Feedback and suggestions](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
+[中文](README.md) · [Download Beta](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-beta.2) · [Validation evidence](docs/validation/v0.5.0-beta.2.md) · [Feedback and suggestions](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
 
 A C++20 official-image downloader and experimental Linux recovery tool, with small offline Shell components. Previously named `ubuntu-reset`; the old command remains compatible.
 
-**v0.5.0-beta.1 public testing:** follow the [testing guide](docs/beta-testing.md) in a disposable VM and report bugs or suggestions. Completed checks and remaining validation gaps are listed separately below.
+**v0.5.0-beta.2 public testing:** follow the [testing guide](docs/beta-testing.md) in a disposable VM and report bugs or suggestions. Completed checks and remaining validation gaps are listed separately below.
 
 Ubuntu 26.04 AMD64 completed the real GUI flow, two successive restorations, new-administrator/sudo checks and interrupted-write rollback. Debian 13 and Fedora 45 AMD64 restoration baselines are linked in the evidence. **On 2026-11-09, Ubuntu 26.04 ARM64 UEFI also completed actual restoration, reboot, new-administrator creation, password-authenticated sudo and powered-off disk/temporary-backup checks.** Consult the record for other combinations and physical-hardware limits.
 
@@ -60,6 +60,8 @@ Preparation, downloads and previews do not perform restoration. Once armed, the 
 Successful reset deletes temporary rollback data and the host-generated rescue initramfs. Successful rollback intentionally restores old accounts and files. This is not A/B boot management, secure erasure or a transaction guarantee against damaged hardware and every post-reset driver failure. Native Ubuntu Pi boot retains its earlier flow without this UEFI rollback protocol. See the [recovery protocol](docs/recovery.md) and [profile guide](docs/profiles.md).
 
 ISO downloads use official HTTPS SHA-256 metadata. Debian recovery uses SHA-512; native Ubuntu Pi additionally verifies OpenPGP. Generic Ubuntu cloud and Fedora recovery currently use official HTTPS SHA-256 without detached PGP verification. Fedora conversion runs the trusted source's dracut as root; never select untrusted system images.
+
+Beta.2 fixes GUI exit on inaccessible recovery metadata and adds local diagnostics for ordinary users. Choose Export diagnostics in the GUI, or run `linux-factory-reset diagnose --output new-report.json`. Reports contain versions, distribution, architecture, filesystem types, preparation state and tool availability; they exclude usernames, personal paths, disk UUIDs, image URLs and raw logs. Nothing is uploaded. Export creates a new `0600` file and refuses existing files and symlinks.
 
 ## Build and validate
 

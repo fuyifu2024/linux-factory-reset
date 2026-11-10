@@ -14,6 +14,7 @@ static void help() {
     std::cout << "Linux Factory Reset " << uf::VERSION << " (C++20, experimental)\n"
         "  linux-factory-reset gui [--preview]\n"
         "  linux-factory-reset status\n"
+        "  linux-factory-reset diagnose [--output NEWFILE]  # local, read-only report; no sudo\n"
         "  linux-factory-reset catalog\n"
         "  linux-factory-reset resolve --distro fedora --release stable --edition workstation --arch arm64\n"
         "  linux-factory-reset download --distro debian --release stable --edition netinst --arch arm64 --directory ~/Downloads\n"
@@ -38,6 +39,7 @@ int main(int argc, char** argv) {
         std::string cmd = argv[1]; if (cmd == "--version") { std::cout << uf::VERSION << '\n'; return 0; }
         std::map<std::string, std::set<std::string>> allowed{
             {"gui", {"--preview"}}, {"status", {}}, {"sources", {}}, {"firmware-status", {}}, {"plan", {}}, {"cancel", {}},
+            {"diagnose", {"--output"}},
             {"catalog", {}}, {"resolve", {"--distro", "--release", "--edition", "--arch", "--proxy"}},
             {"resolve-recovery", {"--distro", "--version", "--platform", "--proxy"}},
             {"download", {"--distro", "--release", "--edition", "--arch", "--directory", "--proxy"}},
@@ -54,11 +56,26 @@ int main(int argc, char** argv) {
         }
         auto get = [&](const std::string& key) { uf::need(options.contains(key), "Required option: " + key); return options.at(key); };
         if (cmd == "gui") return uf::gui(options.contains("--preview"));
+        if (cmd == "diagnose") {
+            auto report = uf::diagnostics();
+            if (options.contains("--output")) { uf::export_diagnostics(get("--output"), report); std::cout << "Diagnostic report saved locally: " << get("--output") << '\n'; }
+            else std::cout << report.dump(2) << '\n';
+            return 0;
+        }
         if (cmd == "sources") { std::cout << uf::detected_sources().dump(2) << '\n'; return 0; }
         if (cmd == "firmware-status") { std::cout << uf::firmware_status().dump(2) << '\n'; return 0; }
         if (cmd == "status") {
-            if (!uf::fs::exists(uf::STATE)) std::cout << "No factory profile prepared. No reset performed.\n";
-            else { auto s = uf::load_state(); s["reset_pending"] = uf::fs::exists(uf::REQUEST); std::cout << s.dump(2) << '\n'; }
+            auto status = uf::preparation_status();
+            if (status.at("code") == "not-prepared") std::cout << "No factory profile prepared. No reset performed.\n";
+            else if (!status.at("ready").get<bool>()) {
+                std::cerr << "Recovery metadata is unreadable or invalid. No reset performed. Run linux-factory-reset diagnose to collect a local report.\n";
+                return 1;
+            } else {
+                auto s = uf::load_state(); std::error_code error;
+                bool pending = uf::fs::exists(uf::REQUEST, error);
+                s["reset_pending"] = error ? uf::json(nullptr) : uf::json(pending);
+                std::cout << s.dump(2) << '\n';
+            }
             return 0;
         }
         if (cmd == "catalog") { std::cout << uf::download_catalog().dump(2) << '\n'; return 0; }

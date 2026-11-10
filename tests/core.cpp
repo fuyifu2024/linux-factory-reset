@@ -35,6 +35,25 @@ int main() {
         check(!preparation_status(tmp.path / "broken-state", false).at("ready").get<bool>(), "corrupt preparation metadata does not enable preview");
         write(tmp.path / "state.json", state().dump());
         check(preparation_status(tmp.path / "state.json", false).at("ready").get<bool>(), "valid preparation metadata enables preview");
+        fs::create_symlink("loop", tmp.path / "loop");
+        check(preparation_status(tmp.path / "loop/state.json", false).at("code") == "invalid-state", "filesystem lookup failure stays inside the GUI status guard");
+        auto private_state = state(); private_state["private_note"] = "DO-NOT-EXPORT-personal-secret";
+        write(tmp.path / "private-state", private_state.dump());
+        auto report = diagnostics(tmp.path / "private-state", false);
+        check(report.at("preparation").at("ready").get<bool>(), "diagnostics checks preparation without exporting raw state");
+        for (const auto& secret : {"DO-NOT-EXPORT-personal-secret", "1111-2222", "5555-6666"})
+            check(report.dump().find(secret) == std::string::npos, "diagnostic allowlist excludes state secrets and UUIDs");
+        check(report.dump().find(tmp.path.string()) == std::string::npos && !report.contains("reason"), "diagnostics excludes personal paths and raw errors");
+        check(diagnostics(tmp.path / "loop/state.json", false).at("preparation").at("code") == "invalid-state", "diagnostics survives filesystem lookup failures");
+        auto report_file = tmp.path / "report.json"; export_diagnostics(report_file, report);
+        struct stat report_stat{};
+        check(stat(report_file.c_str(), &report_stat) == 0 && (report_stat.st_mode & 0777) == 0600, "diagnostic report is private to its owner");
+        check(json::parse(read(report_file)) == report, "diagnostic export is valid JSON");
+        rejects([&] {export_diagnostics(report_file, json{{"changed", true}});}, "diagnostics never overwrites an existing file");
+        fs::create_symlink(report_file, tmp.path / "report-link");
+        rejects([&] {export_diagnostics(tmp.path / "report-link", report);}, "diagnostics rejects output symlinks");
+        check(json::parse(read(report_file)) == report, "rejected exports leave existing content intact");
+        check(json::parse(output({UFRESET_TEST_APP, "diagnose"})).at("report_schema") == 1, "diagnostic CLI works without preparing or scheduling a reset");
         auto bounded_file = tmp.path / "bounded-output";
         int bounded_fd = open(bounded_file.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
         check(bounded_fd >= 0, "bounded output fixture opened");

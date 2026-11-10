@@ -33,4 +33,4 @@ body:
     id: evidence
     attributes:
       label: Error and logs / 错误与日志
-      description: Include the actual error; omit passwords, keys and personal files / 请提供实际错误，勿上传密码、密钥和个人文件
+      description: Include the actual error. Beta.2 adds GUI Export diagnostics or linux-factory-reset diagnose --output NEWFILE; review the local JSON before attaching it. Omit passwords, keys and personal files / 请提供实际错误；Beta.2 可在界面导出诊断报告，或运行 linux-factory-reset diagnose --output 新文件名，检查本地 JSON 后再自行附上；勿上传密码、密钥和个人文件

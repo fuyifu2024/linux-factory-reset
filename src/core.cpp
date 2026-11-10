@@ -196,9 +196,11 @@ json load_state(const fs::path& path, bool check_permissions) {
     auto s = json::parse(read(path)); validate_state(s); return s;
 }
 json preparation_status(const fs::path& path, bool check_permissions) {
-    if (!fs::exists(path) && !fs::is_symlink(path))
-        return {{"ready", false}, {"reason", "请先选择并准备恢复镜像，然后再查看变更。当前没有可比较的恢复资料。"}, {"code", "not-prepared"}};
-    try { auto state = load_state(path, check_permissions); return {{"ready", true}, {"reason", "恢复资料已准备，可查看变更"}, {"code", "prepared"}}; }
+    try {
+        if (!fs::exists(path) && !fs::is_symlink(path))
+            return {{"ready", false}, {"reason", "请先选择并准备恢复镜像，然后再查看变更。当前没有可比较的恢复资料。"}, {"code", "not-prepared"}};
+        auto state = load_state(path, check_permissions); return {{"ready", true}, {"reason", "恢复资料已准备，可查看变更"}, {"code", "prepared"}};
+    }
     catch (const std::exception& e) { return {{"ready", false}, {"reason", "恢复资料记录无法读取，请重新准备镜像。\n" + std::string(e.what())}, {"code", "invalid-state"}}; }
 }
 std::string image_format(const fs::path& file) {

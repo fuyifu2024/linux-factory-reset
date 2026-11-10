@@ -122,7 +122,7 @@ static void official_download() {
 int gui(bool preview) {
     if (preview) {
         std::cout << json{{"title", "Linux 恢复出厂设置"}, {"language", "C++20"},
-            {"actions", {"下载官方镜像", "准备恢复资料", "查看变更", "恢复系统", "取消待执行恢复", "高级功能"}},
+            {"actions", {"下载官方镜像", "准备恢复资料", "查看变更", "恢复系统", "取消待执行恢复", "高级功能", "导出诊断报告"}},
             {"preparation_methods", {"选择本地镜像", "自动下载（根据本机自动识别可用性）"}},
             {"requires_url_in_normal_flow", false}, {"iso_automatic_install", false},
             {"preview_requires_prepared_source", true}, {"destructive_confirmation", "清空全部用户"}}.dump(2) << '\n';
@@ -146,13 +146,21 @@ int gui(bool preview) {
             "plan", "查看变更", ready ? "只读预览" : "需先准备镜像",
             "restore", "恢复系统", ready ? "需明确确认并重启" : "需先准备镜像",
             "cancel", "取消待执行恢复", "重启前可取消",
-            "advanced", "高级功能", "管理员恢复源、固件信息"});
+            "advanced", "高级功能", "管理员恢复源、固件信息",
+            "diagnose", "导出诊断报告", "无需管理员权限，仅保存到本机"});
         if (choice.empty()) return 0;
         try {
             if ((choice == "plan" || choice == "restore") && !ready) {
                 show_text(status.at("reason")); continue;
             }
             if (choice == "download") official_download();
+            else if (choice == "diagnose") {
+                auto path = dialog({"--file-selection", "--save", "--filename=linux-factory-reset-diagnostics.json",
+                    "--text=选择新的 JSON 文件名；已有文件不会覆盖。\n仅包含版本、系统、架构、文件系统类型、准备状态和工具是否可用。\n不包含用户名、个人路径、磁盘 UUID、镜像网址或日志，不会自动上传。"});
+                if (path.empty()) continue;
+                auto report = diagnostics(); export_diagnostics(path, report);
+                show_text("诊断报告已保存到本机，没有上传。\n文件：" + path + "\n\n" + report.dump(2));
+            }
             else if (choice == "prepare") {
                 auto sources = detected_sources(); bool automatic = sources.at("automatic_available");
                 Args options{"--list", "--width=720", "--height=320", "--column=ID", "--column=来源", "--hide-column=1", "--print-column=1",

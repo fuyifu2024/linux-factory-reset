@@ -1,10 +1,10 @@
 # Linux Factory Reset
 
-[English](README.en.md) · [下载 Beta](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-beta.1) · [验证记录](docs/validation/v0.5.0-beta.1.md) · [反馈与建议](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
+[English](README.en.md) · [下载 Beta](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-beta.2) · [验证记录](docs/validation/v0.5.0-beta.2.md) · [反馈与建议](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
 
 C++20 编写的 Linux 官方镜像下载与实验性恢复工具，恢复阶段使用少量 Shell。原名 `ubuntu-reset`，旧命令仍兼容。
 
-**v0.5.0-beta.1 公开测试：** 欢迎按 [公测指南](docs/beta-testing.md) 在可丢弃虚拟机中体验，并提交错误和功能建议。下面明确区分已通过的验证和仍待验收的项目。
+**v0.5.0-beta.2 公开测试：** 欢迎按 [公测指南](docs/beta-testing.md) 在可丢弃虚拟机中体验，并提交错误和功能建议。下面明确区分已通过的验证和仍待验收的项目。
 
 Ubuntu 26.04 AMD64 已完成真实 GUI 流程、连续两次恢复、新管理员与 sudo、断电回退。Debian 13、Fedora 45 AMD64 的真实恢复基线见验证记录。**2026-11-09，Ubuntu 26.04 ARM64 UEFI 也已完成实际恢复、重启、新管理员创建、密码认证 sudo，以及关机后的磁盘与临时副本清理检查。** 其他组合和物理硬件的验证范围请以记录为准。
 
@@ -60,6 +60,8 @@ sudo linux-factory-reset arm --confirm ERASE-ALL-USERS --reboot
 完成正常恢复后清除临时回退副本及宿主恢复 initramfs；成功回退则有意恢复原账号和文件。它不是 A/B 系统、磁盘安全擦除或对损坏硬件的事务保证，不能覆盖任意恢复后驱动故障。原生 Ubuntu Pi 路径暂未加入此独立 UEFI 回退协议。细节见 [恢复协议](docs/recovery.md) 和 [资料制作](docs/profiles.md)。
 
 官网 ISO 使用 HTTPS 元数据 SHA-256；Debian 恢复源使用 SHA-512，原生 Ubuntu Pi 来源另校验 OpenPGP。通用 Ubuntu 云镜像和 Fedora 来源使用官网 HTTPS SHA-256，尚未验证独立 PGP 签名。Fedora 镜像转换会以管理员权限运行可信来源中的 dracut；不要选择不可信系统镜像。
+
+本次 Beta.2 修复恢复资料权限异常时界面退出，新增普通用户可用的本地诊断报告。界面选择“导出诊断报告”，或运行 `linux-factory-reset diagnose --output 新文件名.json`。报告只含版本、系统、架构、文件系统类型、准备状态和工具可用性，不含用户名、个人路径、磁盘 UUID、镜像网址或原始日志，不会自动上传；仅创建权限为 `0600` 的新文件，拒绝覆盖与符号链接。
 
 ## 构建与验证
 
