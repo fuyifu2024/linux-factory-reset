@@ -50,6 +50,32 @@ json hardware() {
     }
     return {{"platform", kind}, {"distro", os.at("id")}, {"version_id", os.at("version_id")}, {"root", root}, {"boot", fw}};
 }
+json check_environment(const fs::path& storage) {
+    json report{{"schema", 1}, {"application_version", VERSION}, {"read_only", true},
+        {"compatible", false}, {"storage_checked", false}, {"restoration_verified", false},
+        {"note", "Layout check only. Image integrity, capacity for rollback and boot preparation still require final preflight. / 仅检查布局；镜像完整性、回退空间及引导准备仍需最终检查。"}};
+    try {
+        auto hw = hardware();
+        report["target"] = {{"distro", hw.at("distro")}, {"version_id", hw.at("version_id")}, {"platform", hw.at("platform")},
+            {"root_filesystem", hw.at("root").at("fstype")}, {"boot_filesystem", hw.at("boot").at("fstype")}};
+        need(!fs::exists(REQUEST) && !fs::is_symlink(REQUEST), "Cancel the pending reset before preparing another profile");
+        if (!storage.empty()) {
+            auto selected = fs::canonical(storage);
+            need(fs::is_directory(selected), "Choose a directory on a mounted ext4 recovery volume");
+            auto info = filesystem(selected);
+            recovery_mount(selected, info, hw); // Same identity/layout rules as preparation, without creating a work directory.
+            report["storage_checked"] = true;
+            report["recovery_free_bytes"] = fs::space(selected).available;
+        }
+        report["compatible"] = true; report["code"] = "compatible-layout";
+        report["reason"] = storage.empty() ? "目标系统布局初检通过；尚未检查恢复盘。" : "目标布局与恢复盘初检通过，没有创建恢复资料或设置恢复标记。";
+    } catch (const std::exception& e) {
+        report["code"] = "layout-unavailable";
+        report["reason"] = "兼容性初检未通过，没有下载镜像或修改系统。\n" + std::string(e.what()) +
+            (geteuid() != 0 ? "\n若错误与读取权限有关，可用 sudo linux-factory-reset check 只读重试。" : "");
+    }
+    return report;
+}
 struct Storage {
     fs::path work; json fsinfo; json hw;
     explicit Storage(const fs::path& path) {

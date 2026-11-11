@@ -28,6 +28,11 @@ else
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends /mnt/recovery/tool.deb
 fi
 # Fault injection alters only the disposable guest's installed test copy.
+check_work_before=no
+[[ ! -e /mnt/recovery/ubuntu-reset ]] || check_work_before=yes
+linux-factory-reset check --storage /mnt/recovery | tee /mnt/recovery/layout-check.json
+test ! -e /var/lib/ubuntu-reset/request
+[[ $check_work_before == yes || ! -e /mnt/recovery/ubuntu-reset ]]
 if [[ $REC_FAULT != none ]]; then
     if [[ $REC_FAULT == failure ]]; then
         sed -i '/uf_relocate .*Cannot relocate/a uf_fail "expected QA write failure"' /usr/lib/ubuntu-reset/restore.sh

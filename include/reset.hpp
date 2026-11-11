@@ -14,7 +14,7 @@ using json = nlohmann::json;
 using Args = std::vector<std::string>;
 struct Error : std::runtime_error { using std::runtime_error::runtime_error; };
 struct Result { int code; std::string text; };
-inline constexpr auto VERSION = "0.5.0-beta.2";
+inline constexpr auto VERSION = "0.5.0-rc.1";
 inline const fs::path STATE = "/etc/ubuntu-reset/state.json";
 inline const fs::path REQUEST = "/var/lib/ubuntu-reset/request";
 void need(bool condition, const std::string& message);
@@ -71,6 +71,7 @@ struct Mount {
     Mount& operator=(const Mount&) = delete;
 };
 json hardware();
+json check_environment(const fs::path& storage = {});
 json firmware_status();
 void firmware_reset(const std::string& confirm);
 void make_profile(const fs::path& root, const fs::path& boot, const std::string& platform,

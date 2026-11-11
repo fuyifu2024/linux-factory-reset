@@ -20,6 +20,12 @@ if grep -E 'DO-NOT-EXPORT|/etc/ubuntu-reset|1111-2222' "$fixture/stdout.json"; t
 if runuser -u nobody -- "$app" status >"$fixture/status" 2>&1; then exit 1; else code=$?; fi
 test "$code" -eq 1
 grep -q 'Run linux-factory-reset diagnose' "$fixture/status"
+if runuser -u nobody -- "$app" check --storage "$fixture" >"$fixture/check.json"; then exit 1; else code=$?; fi
+test "$code" -eq 1
+grep -q '"read_only": true' "$fixture/check.json"
+grep -q '"compatible": false' "$fixture/check.json"
+grep -q '"restoration_verified": false' "$fixture/check.json"
+test ! -e "$fixture/ubuntu-reset"
 runuser -u nobody -- "$app" diagnose --output "$fixture/report.json"
 test "$(stat -c %a "$fixture/report.json")" = 600
 cp "$fixture/report.json" "$fixture/original.json"

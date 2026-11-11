@@ -54,6 +54,10 @@ int main() {
         rejects([&] {export_diagnostics(tmp.path / "report-link", report);}, "diagnostics rejects output symlinks");
         check(json::parse(read(report_file)) == report, "rejected exports leave existing content intact");
         check(json::parse(output({UFRESET_TEST_APP, "diagnose"})).at("report_schema") == 1, "diagnostic CLI works without preparing or scheduling a reset");
+        auto layout = command({UFRESET_TEST_APP, "check"});
+        auto layout_report = json::parse(layout.text);
+        check(layout_report.at("read_only").get<bool>() && !layout_report.at("restoration_verified").get<bool>(), "layout check never claims an actual restoration pass");
+        check(!layout_report.at("storage_checked").get<bool>() && layout.code == (layout_report.at("compatible").get<bool>() ? 0 : 1), "layout-check exit code reflects compatibility and does not invent a storage check");
         auto bounded_file = tmp.path / "bounded-output";
         int bounded_fd = open(bounded_file.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
         check(bounded_fd >= 0, "bounded output fixture opened");

@@ -14,6 +14,7 @@ static void help() {
     std::cout << "Linux Factory Reset " << uf::VERSION << " (C++20, experimental)\n"
         "  linux-factory-reset gui [--preview]\n"
         "  linux-factory-reset status\n"
+        "  linux-factory-reset check [--storage /mnt/recovery]  # read-only layout check\n"
         "  linux-factory-reset diagnose [--output NEWFILE]  # local, read-only report; no sudo\n"
         "  linux-factory-reset catalog\n"
         "  linux-factory-reset resolve --distro fedora --release stable --edition workstation --arch arm64\n"
@@ -40,6 +41,7 @@ int main(int argc, char** argv) {
         std::map<std::string, std::set<std::string>> allowed{
             {"gui", {"--preview"}}, {"status", {}}, {"sources", {}}, {"firmware-status", {}}, {"plan", {}}, {"cancel", {}},
             {"diagnose", {"--output"}},
+            {"check", {"--storage"}},
             {"catalog", {}}, {"resolve", {"--distro", "--release", "--edition", "--arch", "--proxy"}},
             {"resolve-recovery", {"--distro", "--version", "--platform", "--proxy"}},
             {"download", {"--distro", "--release", "--edition", "--arch", "--directory", "--proxy"}},
@@ -56,6 +58,10 @@ int main(int argc, char** argv) {
         }
         auto get = [&](const std::string& key) { uf::need(options.contains(key), "Required option: " + key); return options.at(key); };
         if (cmd == "gui") return uf::gui(options.contains("--preview"));
+        if (cmd == "check") {
+            auto report = uf::check_environment(options.contains("--storage") ? uf::fs::path(get("--storage")) : uf::fs::path{});
+            std::cout << report.dump(2) << '\n'; return report.at("compatible").get<bool>() ? 0 : 1;
+        }
         if (cmd == "diagnose") {
             auto report = uf::diagnostics();
             if (options.contains("--output")) { uf::export_diagnostics(get("--output"), report); std::cout << "Diagnostic report saved locally: " << get("--output") << '\n'; }

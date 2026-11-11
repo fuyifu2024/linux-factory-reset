@@ -36,7 +36,7 @@ struct BusyDialog {
         if (pid > 0) { kill(pid, SIGTERM); int status = 0; while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {} }
     }
 };
-static bool privileged(Args args, bool preview = false) {
+static bool privileged(Args args, bool preview = false, bool show_success = true) {
     args.insert(args.begin(), "/usr/bin/linux-factory-reset");
     args.insert(args.begin(), "--disable-internal-agent");
     args.insert(args.begin(), "/usr/bin/pkexec");
@@ -50,7 +50,7 @@ static bool privileged(Args args, bool preview = false) {
         return false;
     }
     if (preview) show_text("这是只读预览，没有恢复系统。\n*deleting 表示将删除；其他行表示将新增/修改；相同文件不会列出。\n\n" + result.text);
-    else show_text("操作已完成。\n\n" + result.text);
+    else if (show_success) show_text("操作已完成。\n\n" + result.text);
     return true;
 }
 
@@ -122,7 +122,7 @@ static void official_download() {
 int gui(bool preview) {
     if (preview) {
         std::cout << json{{"title", "Linux 恢复出厂设置"}, {"language", "C++20"},
-            {"actions", {"下载官方镜像", "准备恢复资料", "查看变更", "恢复系统", "取消待执行恢复", "高级功能", "导出诊断报告"}},
+            {"actions", {"下载官方镜像", "准备恢复资料", "查看变更", "恢复系统", "取消待执行恢复", "高级功能", "导出诊断报告", "检查兼容性"}},
             {"preparation_methods", {"选择本地镜像", "自动下载（根据本机自动识别可用性）"}},
             {"requires_url_in_normal_flow", false}, {"iso_automatic_install", false},
             {"preview_requires_prepared_source", true}, {"destructive_confirmation", "清空全部用户"}}.dump(2) << '\n';
@@ -147,13 +147,15 @@ int gui(bool preview) {
             "restore", "恢复系统", ready ? "需明确确认并重启" : "需先准备镜像",
             "cancel", "取消待执行恢复", "重启前可取消",
             "advanced", "高级功能", "管理员恢复源、固件信息",
-            "diagnose", "导出诊断报告", "无需管理员权限，仅保存到本机"});
+            "diagnose", "导出诊断报告", "无需管理员权限，仅保存到本机",
+            "check", "检查兼容性", "只读检查目标布局，不下载、不恢复"});
         if (choice.empty()) return 0;
         try {
             if ((choice == "plan" || choice == "restore") && !ready) {
                 show_text(status.at("reason")); continue;
             }
             if (choice == "download") official_download();
+            else if (choice == "check") show_text(check_environment().dump(2));
             else if (choice == "diagnose") {
                 auto path = dialog({"--file-selection", "--save", "--filename=linux-factory-reset-diagnostics.json",
                     "--text=选择新的 JSON 文件名；已有文件不会覆盖。\n仅包含版本、系统、架构、文件系统类型、准备状态和工具是否可用。\n不包含用户名、个人路径、磁盘 UUID、镜像网址或日志，不会自动上传。"});
@@ -177,7 +179,7 @@ int gui(bool preview) {
                 show_text("请选择独立 ext4 恢复磁盘中的任意文件夹，程序会自动识别该磁盘，并在盘内 ubuntu-reset 目录保存资料。\n不能选择当前系统盘里的普通文件夹。虚拟机尚无第二块磁盘时，需要先添加并格式化、挂载它。\n下一步只准备资料，不会恢复系统。镜像需包含干净的已安装系统。ISO 自动安装功能尚未实现。");
                 auto store = dialog({"--file-selection", "--directory"}); if (store.empty()) continue;
                 if (source == "local") privileged({"prepare-image", "--file", image, "--storage", store});
-                else automatic_preparation(sources, store);
+                else if (privileged({"check", "--storage", store}, false, false)) automatic_preparation(sources, store);
             } else if (choice == "plan") privileged({"plan"}, true);
             else if (choice == "cancel") privileged({"cancel"});
             else if (choice == "restore") {

@@ -62,7 +62,10 @@ void request(const std::string& url, Transfer& t, const std::string& proxy) {
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L); curl_easy_setopt(c, CURLOPT_MAXREDIRS, 5L);
     curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, 30L); curl_easy_setopt(c, CURLOPT_LOW_SPEED_LIMIT, 1L); curl_easy_setopt(c, CURLOPT_LOW_SPEED_TIME, 60L);
     curl_easy_setopt(c, CURLOPT_FAILONERROR, 1L); curl_easy_setopt(c, CURLOPT_NOSIGNAL, 1L);
-    curl_easy_setopt(c, CURLOPT_USERAGENT, "linux-factory-reset/0.3");
+    const auto agent = std::string("linux-factory-reset/") + VERSION;
+    curl_easy_setopt(c, CURLOPT_USERAGENT, agent.c_str());
+    // Bound catalog lookups as well as connection/stall timeouts; large image transfers remain progress/cancel driven.
+    if (t.fd < 0) curl_easy_setopt(c, CURLOPT_TIMEOUT, 90L);
     curl_easy_setopt(c, CURLOPT_MAXFILESIZE_LARGE, static_cast<curl_off_t>(t.limit));
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, receive); curl_easy_setopt(c, CURLOPT_WRITEDATA, &t);
     curl_easy_setopt(c, CURLOPT_NOPROGRESS, 0L); curl_easy_setopt(c, CURLOPT_XFERINFOFUNCTION, report); curl_easy_setopt(c, CURLOPT_XFERINFODATA, &t);

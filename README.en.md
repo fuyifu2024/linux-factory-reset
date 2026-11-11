@@ -1,10 +1,10 @@
 # Linux Factory Reset
 
-[中文](README.md) · [Download Beta](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-beta.2) · [Validation evidence](docs/validation/v0.5.0-beta.2.md) · [Feedback and suggestions](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
+[中文](README.md) · [Download RC](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-rc.1) · [Validation evidence](docs/validation/v0.5.0-rc.1.md) · [Feedback and suggestions](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
 
 A C++20 official-image downloader and experimental Linux recovery tool, with small offline Shell components. Previously named `ubuntu-reset`; the old command remains compatible.
 
-**v0.5.0-beta.2 public testing:** follow the [testing guide](docs/beta-testing.md) in a disposable VM and report bugs or suggestions. Completed checks and remaining validation gaps are listed separately below.
+**v0.5.0-rc.1 release candidate:** follow the [testing guide](docs/beta-testing.md) in a disposable VM and report bugs or suggestions. Completed checks and remaining validation gaps are listed separately below.
 
 Ubuntu 26.04 AMD64 completed the real GUI flow, two successive restorations, new-administrator/sudo checks and interrupted-write rollback. Debian 13 and Fedora 45 AMD64 restoration baselines are linked in the evidence. **On 2026-11-09, Ubuntu 26.04 ARM64 UEFI also completed actual restoration, reboot, new-administrator creation, password-authenticated sudo and powered-off disk/temporary-backup checks.** Consult the record for other combinations and physical-hardware limits.
 
@@ -32,6 +32,8 @@ linux-factory-reset gui
 ```
 
 The shared interface provides official downloads, recovery preparation, change preview, reset and cancellation. Ordinary users do not need a custom HTTPS server or manually entered checksum. Cairo software rendering avoids missing virtual-GPU driver problems without changing system graphics settings.
+
+Before preparation, run `linux-factory-reset check --storage /mnt/recovery` for a read-only layout check; retry with sudo if access is denied. GUI automatic preparation checks layout/storage before downloading an image. This never schedules a reset and does not replace final image, rollback-capacity and boot checks. See the [stable-release checklist](docs/stable-readiness.md).
 
 ## Download and recover
 
