@@ -1,0 +1,19 @@
+{
+  "application_version": "0.5.0-rc.1",
+  "code": "compatible-layout",
+  "compatible": true,
+  "note": "Layout check only. Image integrity, capacity for rollback and boot preparation still require final preflight. / 仅检查布局；镜像完整性、回退空间及引导准备仍需最终检查。",
+  "read_only": true,
+  "reason": "目标布局与恢复盘初检通过，没有创建恢复资料或设置恢复标记。",
+  "recovery_free_bytes": 31766409216,
+  "restoration_verified": false,
+  "schema": 1,
+  "storage_checked": true,
+  "target": {
+    "boot_filesystem": "vfat",
+    "distro": "ubuntu",
+    "platform": "x86_64-uefi",
+    "root_filesystem": "ext4",
+    "version_id": "26.04"
+  }
+}

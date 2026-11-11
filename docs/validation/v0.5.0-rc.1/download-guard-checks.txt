@@ -1,0 +1,2 @@
+2026-11-11T11:44:53.9874891Z Actual GUI controller stopped automatic preparation at the real read-only check, before catalog lookup or download selection.
+2026-11-11T11:44:38.7001424Z Actual GUI controller stopped automatic preparation at the real read-only check, before catalog lookup or download selection.
