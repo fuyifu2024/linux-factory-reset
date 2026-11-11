@@ -3,10 +3,9 @@
 set -eu
 [ -f /.dockerenv ] || exit 1
 app=$1
-if ! "$app" sources | grep -q '"automatic_available": true'; then
-    echo 'No automatic source on this container; automatic-flow guard tested by the other native distributions.'
-    exit 0
-fi
+# Containers have no UEFI and therefore no offered automatic source. The dialog
+# double deliberately supplies that selection to exercise the refusal branch;
+# the real backend must still reject the layout before any network operation.
 test ! -e /etc/ubuntu-reset/state.json
 test ! -e /var/lib/ubuntu-reset/request
 fixture=$(mktemp -d)
