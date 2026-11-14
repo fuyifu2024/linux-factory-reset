@@ -10,8 +10,11 @@
 
 namespace uf {
 static std::string dialog(Args args) {
+    bool file_picker = std::find(args.begin(), args.end(), "--file-selection") != args.end();
     args.insert(args.begin(), "zenity"); args.push_back("--title=" + tr("title"));
-    args.push_back("--ok-label=" + tr("button.ok")); args.push_back("--cancel-label=" + tr("cancel"));
+    // Zenity's native file chooser rejects custom button labels. Its buttons
+    // follow the installed GTK language pack; application dialogs use ours.
+    if (!file_picker) { args.push_back("--ok-label=" + tr("button.ok")); args.push_back("--cancel-label=" + tr("cancel")); }
     auto r = command(args, true, -1, true);
     if (r.code == 1 || r.code == 5) return "";
     need(r.code == 0, tr("error.dialog"));

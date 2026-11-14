@@ -57,8 +57,9 @@ async function chooseDirectory(path) {
   run('scrot',['--overwrite',dir+(path==='/mnt/recovery'?'/directory-recovery.png':'/directory-download.png')]);
   await keys(d,'Return');
   // Enter in GTK's location entry navigates into a folder. Activate the real
-  // Select button as a separate action (the application uses the C locale).
-  await keys(d,'alt+c');log('Selected directory '+path);
+  // Native file-picker buttons follow GTK's installed translations. This VM
+  // has English GTK resources for Chinese selection, so Select retains Alt+S.
+  await keys(d,'alt+s');log('Selected directory '+path);
 }
 async function confirm(value) {
   const d=await waitFor(d=>d.args.includes('--entry'),'confirmation');

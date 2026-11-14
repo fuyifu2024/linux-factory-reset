@@ -28,7 +28,9 @@ case "$1" in
             case "$arg" in --filename=*) cat "${arg#--filename=}" >"$GUI_FLOW_DIR/message" ;; esac
         done
         ;;
-    --file-selection) printf '%s/report.json\n' "$GUI_FLOW_DIR" ;;
+    --file-selection)
+        for arg in "$@"; do case "$arg" in --ok-label=*|--cancel-label=*) exit 89 ;; esac; done
+        printf '%s/report.json\n' "$GUI_FLOW_DIR" ;;
     *) exit 88 ;;
 esac
 DIALOG
