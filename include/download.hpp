@@ -10,7 +10,7 @@ struct TransferProgress {
     std::string text() const;
 };
 using Progress = std::function<bool(const TransferProgress&)>;
-struct Cancelled : Error { Cancelled() : Error("下载已取消，未设置恢复标记。") {} };
+struct Cancelled : Error { Cancelled() : Error(tr("download.cancelled")) {} };
 struct OfficialImage {
     std::string distro, release, edition, arch, filename, url, checksum;
     uint64_t size = 0;

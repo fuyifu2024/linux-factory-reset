@@ -42,7 +42,9 @@ DIALOG
 cat >/usr/bin/pkexec <<'CHECK'
 #!/bin/sh
 set -eu
-test "$#" -eq 5
+test "$#" -eq 7
+test "$6" = --language
+test "$7" = zh
 test "$1" = --disable-internal-agent
 test "$3" = check
 test "$4" = --storage
@@ -51,7 +53,7 @@ shift
 exec "$@"
 CHECK
 chmod 755 /usr/bin/zenity /usr/bin/pkexec
-runuser -u gui-smoke -- env GUI_FLOW_DIR="$fixture/state" "$app" gui
+runuser -u gui-smoke -- env GUI_FLOW_DIR="$fixture/state" "$app" gui --language zh
 test "$(cat "$fixture/state/backend-actions")" = check
 grep -q '"compatible": false' "$fixture/state/messages"
 test ! -e "$fixture/state/ubuntu-reset"

@@ -19,7 +19,7 @@ static json state() {
 }
 int main() {
     try {
-        TempDir tmp("/tmp");
+        set_language("en"); TempDir tmp("/tmp");
         auto shared_esp = tmp.path / "esp-guard";
         fs::create_directories(shared_esp / "EFI/ubuntu"); fs::create_directories(shared_esp / "EFI/BOOT");
         exclusive_esp(shared_esp, "ubuntu"); ++checks;
@@ -81,7 +81,7 @@ int main() {
         auto observed = command({"sh", "-c", "printf first; sleep 0.6; printf last; exit 7"}, true, -1, false, false, false, 0,
             [&](const std::string& chunk) { if (chunk.empty()) ++ticks; if (chunk == "first") { observed_first = true; throw Error("display disconnected"); } });
         check(observed_first && ticks >= 2 && observed.code == 7 && observed.text == "firstlast", "live output and silent-period heartbeat work; observer failure never interrupts the backend");
-        check(stage_label("packing") == "生成压缩恢复资料" && stage_label("<untrusted>").empty(), "only allowlisted stages can control progress labels");
+        check(stage_label("packing") == "Building compressed recovery data" && stage_label("<untrusted>").empty(), "only allowlisted stages can control progress labels");
         auto bounded_file = tmp.path / "bounded-output";
         int bounded_fd = open(bounded_file.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
         check(bounded_fd >= 0, "bounded output fixture opened");
@@ -110,7 +110,7 @@ int main() {
         rejects([&] {recovery_mount("/media/recovery", readonly, target);}, "read-only recovery storage refused");
         check(image_format("SYSTEM.IMG.XZ") == "raw-xz", "uppercase image suffix accepted");
         TransferProgress progress{1024, 2048, 512};
-        check(progress.percent() == 50 && progress.text().find("/s") != std::string::npos && progress.text().find("秒") != std::string::npos, "percent speed and ETA are visible");
+        check(progress.percent() == 50 && progress.text().find("/s") != std::string::npos && progress.text().find("remaining") != std::string::npos, "percent speed and ETA are visible");
         check(TransferProgress{1,0,0}.percent() == 0 && TransferProgress{10,10,1}.percent() == 99, "unknown sizes and verification keep progress below success");
         auto official = parse_sums(std::string(64,'c') + " *ubuntu-26.04-desktop-arm64.iso\n" + std::string(64,'a') + " *ubuntu-26.04.1-desktop-arm64.iso\n", "ubuntu", "26.04", "desktop", "arm64", "https://cdimage.ubuntu.com/releases/26.04/release/");
         check(official.filename == "ubuntu-26.04.1-desktop-arm64.iso" && official.arch == "arm64" && !official.describe().at("automatic_restore").get<bool>(), "official ISO metadata never enables reset");

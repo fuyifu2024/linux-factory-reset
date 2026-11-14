@@ -58,7 +58,7 @@ async function chooseDirectory(path) {
   await keys(d,'Return');
   // Enter in GTK's location entry navigates into a folder. Activate the real
   // Select button as a separate action (the application uses the C locale).
-  await keys(d,'alt+s');log('Selected directory '+path);
+  await keys(d,'alt+c');log('Selected directory '+path);
 }
 async function confirm(value) {
   const d=await waitFor(d=>d.args.includes('--entry'),'confirmation');
@@ -69,18 +69,18 @@ try {
   await main(1);
   let d=await waitFor(d=>d.args.includes('--column=来源'),'source');await keys(d,'Home','Down','Return');
   await info('请选择独立 ext4');await chooseDirectory('/mnt/recovery');
-  await info('请选择一个用于暂存');await chooseDirectory('/home/lfr_old_user');
+  await info('请选择暂存下载镜像的目录');await chooseDirectory('/home/lfr_old_user');
   await info('操作已完成',900000);log('Official download and privileged image preparation completed');
   await main(2);await info('这是只读预览');log('Actual root/ESP preview completed');
   await main(3);await confirm('wrong confirmation');
   await waitFor(d=>d.args.includes('--column=状态'),'wrong-confirmation return');log('Wrong destructive confirmation rejected');
   fs.writeFileSync(dir+'/request-arm','1');
   await waitMarker('armed');
-  await main(4);await info('Pending reset cancelled');
+  await main(4);await info('待执行恢复已取消');
   fs.writeFileSync(dir+'/request-check-cancel','1');
   await waitMarker('cancel-verified');
   log('GUI cancelled an actual armed reset; root checked marker and BootOrder');
-  await main(3);fs.writeFileSync(dir+'/begin-restore','1');await confirm('清空全部用户');
+  await main(3);fs.writeFileSync(dir+'/begin-restore','1');await confirm('ERASE-ALL-USERS');
   // Final arm has its own real polkit prompt. Keep the agent driven until the
   // privileged backend actually writes its request, rather than just typing OK.
   await waitMarker('restore-armed');

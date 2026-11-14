@@ -19,7 +19,7 @@
 
 extern char** environ;
 namespace uf {
-void need(bool ok, const std::string& message) { if (!ok) throw Error(message); }
+void need(bool ok, const std::string& message) { if (!ok) throw Error(localize_message(message)); }
 std::string read(const fs::path& path) {
     std::ifstream f(path, std::ios::binary);
     need(f.good(), "Cannot read " + path.string());
@@ -209,10 +209,10 @@ json load_state(const fs::path& path, bool check_permissions) {
 json preparation_status(const fs::path& path, bool check_permissions) {
     try {
         if (!fs::exists(path) && !fs::is_symlink(path))
-            return {{"ready", false}, {"reason", "请先选择并准备恢复镜像，然后再查看变更。当前没有可比较的恢复资料。"}, {"code", "not-prepared"}};
-        auto state = load_state(path, check_permissions); return {{"ready", true}, {"reason", "恢复资料已准备，可查看变更"}, {"code", "prepared"}};
+            return {{"ready", false}, {"reason", tr("prepared.missing")}, {"code", "not-prepared"}};
+        auto state = load_state(path, check_permissions); return {{"ready", true}, {"reason", tr("prepared.ready")}, {"code", "prepared"}};
     }
-    catch (const std::exception& e) { return {{"ready", false}, {"reason", "恢复资料记录无法读取，请重新准备镜像。\n" + std::string(e.what())}, {"code", "invalid-state"}}; }
+    catch (const std::exception& e) { return {{"ready", false}, {"reason", tr("prepared.invalid") + "\n" + std::string(e.what())}, {"code", "invalid-state"}}; }
 }
 std::string image_format(const fs::path& file) {
     auto name = file.filename().string();
@@ -227,10 +227,11 @@ std::string image_format(const fs::path& file) {
 json source_capabilities(const std::string& distro, const std::string& version, const std::string& platform) {
     bool uefi = platform == "x86_64-uefi" || platform == "arm64-uefi";
     bool automatic = (distro == "ubuntu" && ((version == "26.04" && platform == "raspi-arm64") || (uefi && (version == "24.04" || version == "26.04")))) || (distro == "debian" && version == "13" && uefi) || (distro == "fedora" && (version == "44" || version == "45") && uefi);
-    return {{"automatic_available", automatic}, {"distro", distro}, {"version", version}, {"platform", platform},
+    auto result = json{{"automatic_available", automatic}, {"distro", distro}, {"version", version}, {"platform", platform},
             {"automatic_release", automatic ? version : ""},
             {"reason", automatic ? (platform != "raspi-arm64" ? "自动获取官方基础/服务器镜像（无桌面），版本与当前系统一致，以官网 HTTPS 校验值验证。恢复后创建新管理员；云端账号初始化将被禁用。不是原桌面的历史副本。" : "可自动选择 Ubuntu 官方来源并验签，无需填写网址") : "当前设备还没有内置并验证的官方自动恢复源。请选择本地 IMG/RAW 等镜像；无需自建网址。"},
             {"iso_automatic_install", false}, {"local_formats", {"img", "raw", "img.xz", "raw.xz", "qcow2", "squashfs"}}};
+    result["reason"] = localize_message(result.at("reason").get<std::string>()); return result;
 }
 fs::path recovery_mount(const fs::path& selected, const json& filesystem, const json& target) {
     need(filesystem.at("uuid") != target.at("root").at("uuid") && filesystem.at("uuid") != target.at("boot").at("uuid"),

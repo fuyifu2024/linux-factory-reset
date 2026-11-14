@@ -341,7 +341,7 @@ static void register_profile(const fs::path& profile, const Storage& st, const j
                {"boot_uuid", st.hw["boot"]["uuid"]}, {"store_uuid", st.fsinfo["uuid"]}, {"file", "ubuntu-reset/" + str(final.filename())},
                {"sha256", sha256(final)}, {"provenance", provenance}};
     validate_state(state); atomic_write(STATE, state.dump(2) + "\n", 0644);
-    std::cout << "Recovery data prepared. No reset has been performed.\n";
+    std::cout << tr("recovery.prepared") << '\n';
 }
 struct Loop {
     std::string device;
@@ -622,7 +622,7 @@ void arm(const json& s, const std::string& confirmation, bool reboot) {
         operation_stage("rescue"); install_rescue(s, profile, initrd, k);
     }
     operation_stage("arming"); atomic_write(REQUEST, s.at("id").get<std::string>() + "\n");
-    std::cout << "Reset armed with independent UEFI rescue and temporary rollback backup. Cancel before reboot: sudo ubuntu-reset cancel\n" << std::flush;
+    std::cout << tr("recovery.armed") << '\n' << std::flush;
     if (reboot) run({"systemctl", "reboot"});
 }
 void cancel() {
@@ -652,7 +652,7 @@ void cancel() {
         }
     }
     if (fs::exists(REQUEST) || fs::is_symlink(REQUEST)) { secure(REQUEST); fs::remove(REQUEST); sync(); }
-    std::cout << "Pending reset cancelled. System files were not restored.\n";
+    std::cout << tr("recovery.cancelled") << '\n';
 }
 json firmware_status() {
     std::vector<std::string> matches; fs::path base = "/sys/class/firmware-attributes";

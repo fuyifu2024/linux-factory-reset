@@ -2,8 +2,14 @@
 Type=Application
 Name=Linux Factory Reset
 Name[zh_CN]=Linux 恢复出厂设置
+Name[hi]=Linux फ़ैक्टरी रीसेट
+Name[es]=Restablecimiento de Linux
+Name[ar]=استعادة إعدادات Linux
 Comment=Download official images and prepare experimental recovery
 Comment[zh_CN]=下载官方镜像并准备实验性恢复资料
+Comment[hi]=आधिकारिक इमेज डाउनलोड करें और पुनर्स्थापना तैयार करें
+Comment[es]=Descargar imágenes oficiales y preparar la restauración
+Comment[ar]=تنزيل الصور الرسمية وتجهيز الاستعادة
 Exec=linux-factory-reset gui
 Icon=linux-factory-reset
 Terminal=true

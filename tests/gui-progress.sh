@@ -28,7 +28,9 @@ DIALOG
 cat >/usr/bin/pkexec <<'BACKEND'
 #!/bin/sh
 set -eu
-test "$#" -eq 3
+test "$#" -eq 5
+test "$4" = --language
+test "$5" = zh
 test "$3" = cancel
 printf '\nLFR_STAGE {"stage":"verifying"}\n'
 sleep 1.3
@@ -38,7 +40,7 @@ sleep 1.3
 printf 'Fixture backend finished without performing a reset.\n'
 BACKEND
 chmod 755 /usr/bin/zenity /usr/bin/pkexec
-runuser -u gui-smoke -- env GUI_FLOW_DIR="$fixture/state" "$app" gui
+runuser -u gui-smoke -- env GUI_FLOW_DIR="$fixture/state" "$app" gui --language zh
 grep -q '校验镜像完整性' "$fixture/state/progress"
 grep -q '生成压缩恢复资料' "$fixture/state/progress"
 grep -q '阶段已用 1 秒' "$fixture/state/progress"

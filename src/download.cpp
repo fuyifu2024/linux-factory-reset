@@ -95,9 +95,9 @@ void validate(const OfficialImage& i) {
 }
 int TransferProgress::percent() const { return total ? static_cast<int>(std::min(99.0, 100.0 * static_cast<double>(downloaded) / static_cast<double>(total))) : 0; }
 std::string TransferProgress::text() const {
-    std::ostringstream out; out << human(static_cast<double>(downloaded)) << " / " << (total ? human(static_cast<double>(total)) : "大小未知")
+    std::ostringstream out; out << human(static_cast<double>(downloaded)) << " / " << (total ? human(static_cast<double>(total)) : tr("download.unknown_size"))
         << "  |  " << human(bytes_per_second) << "/s";
-    if (total > downloaded && bytes_per_second > 0) out << "  |  约剩 " << static_cast<uint64_t>(std::min(8640000.0, static_cast<double>(total-downloaded)/bytes_per_second)) << " 秒";
+    if (total > downloaded && bytes_per_second > 0) out << "  |  " << tr("download.eta", {{"seconds", std::to_string(static_cast<uint64_t>(std::min(8640000.0, static_cast<double>(total-downloaded)/bytes_per_second)))}});
     return out.str();
 }
 json OfficialImage::describe() const {

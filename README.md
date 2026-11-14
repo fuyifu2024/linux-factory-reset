@@ -1,10 +1,10 @@
 # Linux Factory Reset
 
-[English](README.en.md) · [下载 RC](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-rc.2) · [验证记录](docs/validation/v0.5.0-rc.2.md) · [反馈与建议](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
+[English](README.en.md) · [下载 RC](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-rc.3) · [验证记录](docs/validation/v0.5.0-rc.3.md) · [反馈与建议](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
 
 C++20 编写的 Linux 官方镜像下载与实验性恢复工具，恢复阶段使用少量 Shell。原名 `ubuntu-reset`，旧命令仍兼容。
 
-**v0.5.0-rc.2 正式版候选：** 欢迎按 [公测指南](docs/beta-testing.md) 在可丢弃虚拟机中体验，并提交错误和功能建议。下面明确区分已通过的验证和仍待验收的项目。
+**v0.5.0-rc.3 正式版候选：** 欢迎按 [公测指南](docs/beta-testing.md) 在可丢弃虚拟机中体验，并提交错误和功能建议。下面明确区分已通过的验证和仍待验收的项目。
 
 Ubuntu 26.04 AMD64 已完成真实 GUI 流程、连续两次恢复、新管理员与 sudo、断电回退。Debian 13、Fedora 45 AMD64 的真实恢复基线见验证记录。**2026-11-09，Ubuntu 26.04 ARM64 UEFI 也已完成实际恢复、重启、新管理员创建、密码认证 sudo，以及关机后的磁盘与临时副本清理检查。** 其他组合和物理硬件的验证范围请以记录为准。
 
@@ -20,6 +20,8 @@ Ubuntu 26.04 AMD64 已完成真实 GUI 流程、连续两次恢复、新管理�
 | 尚不支持 | 安装 ISO 自动恢复、Btrfs **目标**、LVM、加密、RAID、额外 `/boot` 或 `/home` 分区、共享/OEM ESP、Mint |
 
 **通用 UEFI 自动来源是不带桌面的基础/服务器系统，不会精确复原原来的桌面软件和配置。** Fedora 官方 Btrfs 来源、Ubuntu 独立 `/boot` 来源可以在暂存区转换；这不表示当前已安装的 Btrfs 或独立 `/boot` 目标能够直接重置。ARM64 不限于树莓派，但通用路径要求 UEFI；其他原生 U-Boot/板卡固件仍需适配。
+
+支持 **英语、简体中文、印地语、西班牙语、阿拉伯语**，自动跟随系统，也可在主界面“语言”中切换。例：`linux-factory-reset gui --language zh`。阿拉伯语支持从右向左布局；所有语言统一输入 `ERASE-ALL-USERS` 确认清空。[语言说明](docs/languages.md)。
 
 ## 安装
 

@@ -21,8 +21,10 @@ jobs:
       DEBIAN_FRONTEND: noninteractive
     steps:
       - name: Install build and fixture-test dependencies
-        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates git build-essential cmake file libssl-dev libcurl4-openssl-dev nlohmann-json3-dev rsync squashfs-tools shellcheck
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates git build-essential cmake file libssl-dev libcurl4-openssl-dev nlohmann-json3-dev rsync squashfs-tools shellcheck nodejs
       - uses: actions/checkout@v4
+      - name: Validate complete translation catalogs
+        run: node tests/catalogs.mjs
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
       - name: Build
@@ -32,7 +34,7 @@ jobs:
       - name: Real HTTPS download and cancellation in disposable container
         run: sh tests/https.sh "$PWD/build/test-download"
       - name: Shell validation
-        run: shellcheck -e SC1091 boot/hook boot/local-bottom boot/restore.sh boot/reconcile.sh boot/relocate.sh firstboot/firstboot.sh tests/reconcile.sh tests/relocate.sh tests/https.sh tests/gui-flow.sh tests/gui-prepare-check.sh tests/gui-progress.sh tests/diagnostics.sh
+        run: shellcheck -e SC1091 boot/hook boot/local-bottom boot/restore.sh boot/reconcile.sh boot/relocate.sh firstboot/firstboot.sh tests/reconcile.sh tests/relocate.sh tests/https.sh tests/gui-flow.sh tests/gui-prepare-check.sh tests/gui-progress.sh tests/gui-languages.sh tests/language-ui.sh tests/diagnostics.sh
       - name: Package
         run: cd build && cpack -G DEB
       - name: Install package in disposable container (never arm reset)
@@ -48,7 +50,7 @@ jobs:
         run: sh tests/diagnostics.sh /usr/bin/linux-factory-reset
       - name: Start GUI without GPU in disposable container
         run: |
-          apt-get install -y --no-install-recommends xvfb xauth
+          apt-get install -y --no-install-recommends xvfb xauth xdotool scrot procps fonts-noto-core fonts-noto-cjk
           useradd --create-home gui-smoke
           set +e
           runuser -u gui-smoke -- env -u GSK_RENDERER -u LIBGL_ALWAYS_SOFTWARE LC_ALL=C xvfb-run -a timeout --kill-after=2 5 linux-factory-reset gui > /tmp/gui-smoke.log 2>&1
@@ -63,13 +65,22 @@ jobs:
         run: sh tests/gui-prepare-check.sh /usr/bin/linux-factory-reset
       - name: Render preparation stages and elapsed time
         run: sh tests/gui-progress.sh /usr/bin/linux-factory-reset
+      - name: Verify five-language confirmation and preferences
+        run: sh tests/gui-languages.sh /usr/bin/linux-factory-reset
+      - name: Render five languages and verify actual GTK direction
+        run: sh tests/language-ui.sh /usr/bin/linux-factory-reset "$PWD/build/test-gtk-direction" "$PWD/build/language-evidence"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: language-evidence-${{ matrix.os.label }}-${{ matrix.runner }}
+          path: build/language-evidence/*
       - name: Collect distro-specific binary and package
         env:
           TASK_DISTRO: ${{ matrix.os.label }}
         run: |
           TASK_ARCH=$(dpkg --print-architecture)
           mkdir -p build/release
-          cp build/*.deb "build/release/linux-factory-reset_0.5.0-rc.2_${TASK_DISTRO}_${TASK_ARCH}.deb"
+          cp build/*.deb "build/release/linux-factory-reset_0.5.0-rc.3_${TASK_DISTRO}_${TASK_ARCH}.deb"
           cp build/linux-factory-reset "build/release/linux-factory-reset-${TASK_DISTRO}-linux-${TASK_ARCH}"
           strip "build/release/linux-factory-reset-${TASK_DISTRO}-linux-${TASK_ARCH}"
           cd build/release

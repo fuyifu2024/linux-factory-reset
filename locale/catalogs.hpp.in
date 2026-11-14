@@ -1,0 +1,8 @@
+#pragma once
+namespace uf::catalog_data {
+inline constexpr auto en = R"lfrjson(@LFR_en@)lfrjson";
+inline constexpr auto zh = R"lfrjson(@LFR_zh@)lfrjson";
+inline constexpr auto hi = R"lfrjson(@LFR_hi@)lfrjson";
+inline constexpr auto es = R"lfrjson(@LFR_es@)lfrjson";
+inline constexpr auto ar = R"lfrjson(@LFR_ar@)lfrjson";
+}

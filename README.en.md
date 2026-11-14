@@ -1,10 +1,10 @@
 # Linux Factory Reset
 
-[中文](README.md) · [Download RC](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-rc.2) · [Validation evidence](docs/validation/v0.5.0-rc.2.md) · [Feedback and suggestions](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
+[中文](README.md) · [Download RC](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-rc.3) · [Validation evidence](docs/validation/v0.5.0-rc.3.md) · [Feedback and suggestions](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
 
 A C++20 official-image downloader and experimental Linux recovery tool, with small offline Shell components. Previously named `ubuntu-reset`; the old command remains compatible.
 
-**v0.5.0-rc.2 release candidate:** follow the [testing guide](docs/beta-testing.md) in a disposable VM and report bugs or suggestions. Completed checks and remaining validation gaps are listed separately below.
+**v0.5.0-rc.3 release candidate:** follow the [testing guide](docs/beta-testing.md) in a disposable VM and report bugs or suggestions. Completed checks and remaining validation gaps are listed separately below.
 
 Ubuntu 26.04 AMD64 completed the real GUI flow, two successive restorations, new-administrator/sudo checks and interrupted-write rollback. Debian 13 and Fedora 45 AMD64 restoration baselines are linked in the evidence. **On 2026-11-09, Ubuntu 26.04 ARM64 UEFI also completed actual restoration, reboot, new-administrator creation, password-authenticated sudo and powered-off disk/temporary-backup checks.** Consult the record for other combinations and physical-hardware limits.
 
@@ -20,6 +20,8 @@ Ubuntu 26.04 AMD64 completed the real GUI flow, two successive restorations, new
 | Not supported | Automatic installer-ISO deployment, Btrfs **targets**, LVM, encryption, RAID, separate `/boot` or `/home`, shared/OEM ESPs, Mint |
 
 **Generic automatic sources are base/server systems without a desktop. They do not recreate the exact original desktop installation.** Fedora's official Btrfs source and Ubuntu split-boot sources can be normalized in staging; existing Btrfs or split-boot targets remain unsupported. ARM64 is not limited to Raspberry Pi, but generic devices need UEFI; other native board firmware/U-Boot flows need adapters.
+
+Includes **English, Simplified Chinese, Hindi, Spanish and Arabic**, with automatic detection and a persistent language menu. Example: `linux-factory-reset gui --language es`. Arabic uses right-to-left layout; every language requires `ERASE-ALL-USERS` for deletion. See the [language guide](docs/languages.md).
 
 ## Install
 

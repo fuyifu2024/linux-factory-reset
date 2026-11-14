@@ -11,36 +11,40 @@
 static volatile std::sig_atomic_t download_interrupted = 0;
 static void stop_download(int) { download_interrupted = 1; }
 static void help() {
-    std::cout << "Linux Factory Reset " << uf::VERSION << " (C++20, experimental)\n"
+    std::cout << "Linux Factory Reset " << uf::VERSION << " (C++20, " << uf::tr("cli.experimental") << ")\n"
         "  linux-factory-reset gui [--preview]\n"
+        "  linux-factory-reset languages\n"
         "  linux-factory-reset status\n"
-        "  linux-factory-reset check [--storage /mnt/recovery]  # read-only preparation checks\n"
-        "  linux-factory-reset diagnose [--output NEWFILE]  # local, read-only report; no sudo\n"
+        "  linux-factory-reset check [--storage /mnt/recovery]\n"
+        "  linux-factory-reset diagnose [--output NEWFILE]\n"
         "  linux-factory-reset catalog\n"
         "  linux-factory-reset resolve --distro fedora --release stable --edition workstation --arch arm64\n"
         "  linux-factory-reset download --distro debian --release stable --edition netinst --arch arm64 --directory ~/Downloads\n"
-        "  linux-factory-reset sources  # show actual built-in download availability\n"
+        "  linux-factory-reset sources\n"
         "  sudo linux-factory-reset prepare-image --file /path/to/system.img --storage /mnt/recovery\n"
         "  sudo linux-factory-reset prepare-auto --storage /mnt/recovery\n"
-        "  # Advanced administrator interface: prepare-profile --url URL --sha256 HASH --storage PATH\n"
-        "  sudo linux-factory-reset make-profile --root /mnt/pristine --boot /mnt/pristine-boot --platform x86_64-uefi --output /mnt/factory.squashfs\n"
-        "  # --platform arm64-uefi supports generic ARM64 UEFI/GRUB devices, including Debian\n"
         "  sudo linux-factory-reset plan\n"
         "  sudo linux-factory-reset arm --confirm ERASE-ALL-USERS [--reboot]\n"
         "  sudo linux-factory-reset cancel\n"
         "  linux-factory-reset firmware-status\n"
         "  sudo linux-factory-reset reset-firmware --confirm RESET-BIOS-DEFAULTS\n"
-        "Prepare commands optionally accept --proxy http://127.0.0.1:PORT or socks5h://127.0.0.1:PORT.\n"
-        "Actual restore runs offline in initramfs; it removes ALL personal users/data.\n";
+        "  sudo linux-factory-reset prepare-profile --url URL --sha256 HASH --storage PATH\n"
+        "  sudo linux-factory-reset make-profile-image --file IMAGE --platform arm64-uefi --distro debian --output PROFILE\n"
+        "  sudo linux-factory-reset make-profile --root ROOT --boot BOOT --platform x86_64-uefi --output PROFILE\n"
+        << uf::tr("cli.language") << '\n' << uf::tr("cli.proxy") << '\n' << uf::tr("cli.erase") << '\n';
 }
 int main(int argc, char** argv) {
     try {
         if (geteuid() == 0) umask(0022);
-        if (argc < 2 || std::string(argv[1]) == "--help") { help(); return 0; }
-        std::string cmd = argv[1]; if (cmd == "--version") { std::cout << uf::VERSION << '\n'; return 0; }
+        uf::set_language(); int command_at = 1; bool prefix_language = false;
+        if (argc > 1 && std::string(argv[1]) == "--language") {
+            uf::need(argc > 2, "Missing option value: --language"); uf::set_language(argv[2]); command_at = 3; prefix_language = true;
+        }
+        if (argc <= command_at || std::string(argv[command_at]) == "--help") { help(); return 0; }
+        std::string cmd = argv[command_at]; if (cmd == "--version") { std::cout << uf::VERSION << '\n'; return 0; }
         std::map<std::string, std::set<std::string>> allowed{
             {"gui", {"--preview"}}, {"status", {}}, {"sources", {}}, {"firmware-status", {}}, {"plan", {}}, {"cancel", {}},
-            {"diagnose", {"--output"}},
+            {"diagnose", {"--output"}}, {"languages", {}},
             {"check", {"--storage"}},
             {"catalog", {}}, {"resolve", {"--distro", "--release", "--edition", "--arch", "--proxy"}},
             {"resolve-recovery", {"--distro", "--version", "--platform", "--proxy"}},
@@ -50,13 +54,16 @@ int main(int argc, char** argv) {
             {"make-profile-image", {"--file", "--platform", "--distro", "--output"}},
             {"make-profile", {"--root", "--boot", "--platform", "--output"}},
             {"arm", {"--confirm", "--reboot"}}, {"reset-firmware", {"--confirm"}}};
+        for (auto& [name, flags] : allowed) { (void)name; flags.insert("--language"); }
         uf::need(allowed.contains(cmd), "Unknown command; use --help"); std::map<std::string, std::string> options;
-        for (int i = 2; i < argc; ++i) {
+        for (int i = command_at + 1; i < argc; ++i) {
             std::string key = argv[i]; uf::need(allowed[cmd].contains(key) && !options.contains(key), "Unknown or repeated option: " + key);
             if (key == "--reboot" || key == "--preview") options[key] = "yes";
             else { uf::need(i + 1 < argc, "Missing option value: " + key); options[key] = argv[++i]; }
         }
+        if (options.contains("--language")) { uf::need(!prefix_language, "Repeated option: --language"); uf::set_language(options.at("--language")); }
         auto get = [&](const std::string& key) { uf::need(options.contains(key), "Required option: " + key); return options.at(key); };
+        if (cmd == "languages") { std::cout << uf::available_languages().dump(2) << '\n'; return 0; }
         if (cmd == "gui") return uf::gui(options.contains("--preview"));
         if (cmd == "check") {
             auto report = uf::check_environment(options.contains("--storage") ? uf::fs::path(get("--storage")) : uf::fs::path{});
@@ -64,7 +71,7 @@ int main(int argc, char** argv) {
         }
         if (cmd == "diagnose") {
             auto report = uf::diagnostics();
-            if (options.contains("--output")) { uf::export_diagnostics(get("--output"), report); std::cout << "Diagnostic report saved locally: " << get("--output") << '\n'; }
+            if (options.contains("--output")) { uf::export_diagnostics(get("--output"), report); std::cout << uf::tr("diagnose.saved", {{"path", get("--output")}}) << '\n'; }
             else std::cout << report.dump(2) << '\n';
             return 0;
         }
@@ -72,9 +79,9 @@ int main(int argc, char** argv) {
         if (cmd == "firmware-status") { std::cout << uf::firmware_status().dump(2) << '\n'; return 0; }
         if (cmd == "status") {
             auto status = uf::preparation_status();
-            if (status.at("code") == "not-prepared") std::cout << "No factory profile prepared. No reset performed.\n";
+            if (status.at("code") == "not-prepared") std::cout << uf::tr("cli.no_profile") << '\n';
             else if (!status.at("ready").get<bool>()) {
-                std::cerr << "Recovery metadata is unreadable or invalid. No reset performed. Run linux-factory-reset diagnose to collect a local report.\n";
+                std::cerr << uf::tr("cli.invalid_state") << '\n';
                 return 1;
             } else {
                 auto s = uf::load_state(); std::error_code error;
@@ -93,7 +100,7 @@ int main(int argc, char** argv) {
             auto proxy = options.contains("--proxy") ? get("--proxy") : "";
             auto image = uf::resolve_image(get("--distro"), get("--release"), get("--edition"), get("--arch"), proxy);
             if (cmd == "resolve") std::cout << image.describe().dump(2) << '\n';
-            else { std::signal(SIGINT, stop_download); std::signal(SIGTERM, stop_download); auto path = uf::download_official(image, get("--directory"), [](const uf::TransferProgress& p) { std::cerr << "\r" << p.percent() << "%  " << p.text() << "          " << std::flush; return !download_interrupted; }, proxy); std::cout << "\nSaved: " << path << "\nSHA-256 OK. ISO automatic restore is not implemented.\n"; }
+            else { std::signal(SIGINT, stop_download); std::signal(SIGTERM, stop_download); auto path = uf::download_official(image, get("--directory"), [](const uf::TransferProgress& p) { std::cerr << "\r" << p.percent() << "%  " << p.text() << "          " << std::flush; return !download_interrupted; }, proxy); std::cout << '\n' << uf::tr("download.result", {{"path", path.string()}}) << '\n'; }
             return 0;
         }
         uf::root_only();
@@ -126,5 +133,5 @@ int main(int argc, char** argv) {
             std::cout << "SHA256: " << uf::sha256(out) << '\n';
         }
         close(lock); return 0;
-    } catch (const std::exception& e) { std::cerr << "Linux Factory Reset: " << e.what() << '\n'; return 1; }
+    } catch (const std::exception& e) { std::cerr << "Linux Factory Reset: " << uf::tr("cli.error") << ": " << uf::localize_message(e.what()) << '\n'; return 1; }
 }

@@ -33,17 +33,17 @@ case "$1" in
 esac
 DIALOG
 chmod 755 /usr/bin/zenity
-runuser -u gui-smoke -- env GUI_FLOW_DIR="$fixture/state" "$app" gui
+runuser -u gui-smoke -- env GUI_FLOW_DIR="$fixture/state" "$app" gui --language zh
 grep -q '请先选择并准备恢复镜像' "$fixture/state/message"
 test ! -e /etc/ubuntu-reset/state.json
 test ! -e /var/lib/ubuntu-reset/request
 rm "$fixture/state/selected"
-runuser -u gui-smoke -- env GUI_FLOW_CHOICE=diagnose GUI_FLOW_DIR="$fixture/state" "$app" gui
+runuser -u gui-smoke -- env GUI_FLOW_CHOICE=diagnose GUI_FLOW_DIR="$fixture/state" "$app" gui --language zh
 test "$(stat -c %a "$fixture/state/report.json")" = 600
 grep -q '"report_schema": 1' "$fixture/state/report.json"
 grep -q '诊断报告已保存到本机' "$fixture/state/message"
 rm "$fixture/state/selected"
-runuser -u gui-smoke -- env GUI_FLOW_CHOICE=check GUI_FLOW_DIR="$fixture/state" "$app" gui
+runuser -u gui-smoke -- env GUI_FLOW_CHOICE=check GUI_FLOW_DIR="$fixture/state" "$app" gui --language zh
 grep -q '准备前检查（只读）' "$fixture/state/message"
 grep -q '必需工具' "$fixture/state/message"
 mkdir -p /etc/ubuntu-reset
@@ -51,7 +51,7 @@ old_mode=$(stat -c %a /etc/ubuntu-reset)
 printf '{}\n' >/etc/ubuntu-reset/state.json
 chmod 700 /etc/ubuntu-reset
 rm "$fixture/state/selected"
-runuser -u gui-smoke -- env GUI_FLOW_DIR="$fixture/state" "$app" gui
+runuser -u gui-smoke -- env GUI_FLOW_DIR="$fixture/state" "$app" gui --language zh
 grep -q '恢复资料记录无法读取' "$fixture/state/message"
 chmod "$old_mode" /etc/ubuntu-reset
 rm /etc/ubuntu-reset/state.json

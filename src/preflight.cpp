@@ -28,28 +28,28 @@ json summarize_environment(json checks, bool storage_requested) {
         {"storage_checked", storage_requested && storage_ok}, {"restoration_verified", false},
         {"failure_count", failures}, {"unknown_count", unknown}, {"checks", checks},
         {"code", compatible ? "checks-passed" : "checks-blocked"},
-        {"reason", compatible ? "准备前检查通过；镜像内容和实际引导写入仍需后续验证。" : "准备前检查未通过，请处理以下阻碍及无法确认的项目。"},
-        {"note", "只读检查不会下载镜像、创建恢复目录、设置恢复标记或修改固件。空间为初步估算，不包含镜像导入/展开暂存；后续仍按实际镜像检查。"}};
+        {"reason", compatible ? tr("check.ready") : tr("check.blocked")},
+        {"note", tr("check.note")}};
 }
 std::string environment_text(const json& report) {
-    std::ostringstream text; text << "准备前检查（只读）\n\n" << report.at("reason").get<std::string>() << "\n\n";
+    std::ostringstream text; text << tr("check.title") + "\n\n" << report.at("reason").get<std::string>() << "\n\n";
     for (const auto& check : report.at("checks")) {
         auto status = check.at("status").get<std::string>();
-        auto label = status == "pass" ? "通过" : status == "fail" ? "阻碍" : status == "unknown" ? "无法确认" : "未检查";
+        auto label = status == "pass" ? tr("check.pass") : status == "fail" ? tr("check.fail") : status == "unknown" ? tr("check.unknown") : tr("check.skipped");
         text << '[' << label << "] " << check.at("label").get<std::string>() << "：" << check.at("detail").get<std::string>() << '\n';
     }
     text << '\n' << report.at("note").get<std::string>();
-    if (geteuid() != 0) text << "\n读取权限受限时，可用 sudo linux-factory-reset check --storage /恢复盘挂载点 只读重试。";
+    if (geteuid() != 0) text << "\n" + tr("check.retry");
     return text.str();
 }
 json check_environment(const fs::path& storage) {
     json checks = json::array(), hw, root_mount, boot_mount; std::string distro, boot = "/boot/efi";
     auto add = [&](const std::string& id, const std::string& label, auto action) {
         std::string status = "pass", detail;
-        try { detail = action(); }
-        catch (const Error& e) { status = "fail"; detail = e.what(); }
-        catch (const std::exception& e) { status = "unknown"; detail = e.what(); }
-        checks.push_back({{"id", id}, {"label", label}, {"status", status}, {"detail", detail}});
+        try { detail = localize_message(action()); }
+        catch (const Error& e) { status = "fail"; detail = localize_message(e.what()); }
+        catch (const std::exception& e) { status = "unknown"; detail = localize_message(e.what()); }
+        checks.push_back({{"id", id}, {"label", localize_message(label)}, {"status", status}, {"detail", detail}});
     };
     auto mount_info = [](const fs::path& path) {
         auto rows = json::parse(output({"findmnt", "--json", "--target", path.string(), "-o", "TARGET,SOURCE,FSTYPE,UUID,OPTIONS"})).at("filesystems");
@@ -84,7 +84,7 @@ json check_environment(const fs::path& storage) {
             for (const auto& path : {"/usr/bin/", "/usr/sbin/", "/bin/", "/sbin/"}) if (access((std::string(path) + tool).c_str(), X_OK) == 0) found = true;
             if (!found) missing += (missing.empty() ? "" : ", ") + tool;
         }
-        need(missing.empty(), "缺少工具，请修复安装包依赖：" + missing); return std::string("工具已找到；实际运行仍在后续步骤验证");
+        need(missing.empty(), tr("check.tools_missing", {{"tools", missing}})); return std::string("工具已找到；实际运行仍在后续步骤验证");
     });
     if (uefi) {
         fs::path variables = "/sys/firmware/efi/efivars";
@@ -102,10 +102,10 @@ json check_environment(const fs::path& storage) {
             return std::string("挂载可写且启动顺序可读；未试写变量，不保证固件剩余容量");
         });
     } else checks.push_back({{"id", "secure_boot"}, {"label", "UEFI 专用检查"}, {"status", "not-checked"}, {"detail", "未使用 UEFI；平台是否受支持由布局检查判定"}});
-    add("root_space", "系统盘工作空间", [&] { auto free = fs::space("/").available; need(free >= 512 * MiB, "系统盘可用空间不足 512 MiB，无法可靠生成恢复启动环境"); return std::to_string(free / MiB) + " MiB 可用"; });
+    add("root_space", "系统盘工作空间", [&] { auto free = fs::space("/").available; need(free >= 512 * MiB, "系统盘可用空间不足 512 MiB，无法可靠生成恢复启动环境"); return tr("check.available", {{"mib", std::to_string(free / MiB)}}); });
     add("boot_space", "启动盘工作空间", [&] {
         need(!boot_mount.is_null() && boot_mount.at("target") == boot, "无法确认独立启动盘，未借用根分区空间作为结果");
-        auto free = fs::space(boot).available; need(free >= 64 * MiB, "启动盘可用空间不足 64 MiB"); return std::to_string(free / MiB) + " MiB 可用";
+        auto free = fs::space(boot).available; need(free >= 64 * MiB, "启动盘可用空间不足 64 MiB"); return tr("check.available", {{"mib", std::to_string(free / MiB)}});
     });
     uint64_t free_bytes = 0, estimate = 0;
     if (!storage.empty()) add("storage", "恢复盘与初步空间估算", [&] {
@@ -118,10 +118,11 @@ json check_environment(const fs::path& storage) {
             auto space = fs::space(path); auto used = space.capacity - space.free;
             need(used <= UINT64_MAX - estimate, "空间估算溢出，无法确认容量"); estimate += used;
         }
-        need(free_bytes >= estimate, "恢复盘剩余 " + std::to_string(free_bytes / MiB) + " MiB，初步至少需要 " + std::to_string(estimate / MiB) + " MiB；请释放空间或更换恢复盘");
-        return "可用 " + std::to_string(free_bytes / MiB) + " MiB；初步预留 " + std::to_string(estimate / MiB) + " MiB，另需镜像导入暂存空间";
+        need(free_bytes >= estimate, tr("check.storage_low", {{"available", std::to_string(free_bytes / MiB)}, {"required", std::to_string(estimate / MiB)}}));
+        return tr("check.storage_ok", {{"available", std::to_string(free_bytes / MiB)}, {"required", std::to_string(estimate / MiB)}});
     });
     else checks.push_back({{"id", "storage"}, {"label", "恢复盘"}, {"status", "not-checked"}, {"detail", "未指定恢复盘；可加 --storage 检查"}});
+    for (auto& row : checks) { row["label"] = localize_message(row.at("label").get<std::string>()); row["detail"] = localize_message(row.at("detail").get<std::string>()); }
     auto report = summarize_environment(checks, !storage.empty());
     if (!hw.is_null()) report["target"] = {{"distro", hw.at("distro")}, {"version_id", hw.at("version_id")}, {"platform", hw.at("platform")}};
     if (!storage.empty()) { report["recovery_free_bytes"] = free_bytes; report["recovery_required_bytes_estimate"] = estimate; }

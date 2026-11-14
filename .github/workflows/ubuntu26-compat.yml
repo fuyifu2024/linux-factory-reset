@@ -42,3 +42,4 @@ jobs:
           useradd --create-home gui-smoke
           sh tests/gui-prepare-check.sh /usr/bin/linux-factory-reset
           sh tests/gui-progress.sh /usr/bin/linux-factory-reset
+          sh tests/gui-languages.sh /usr/bin/linux-factory-reset
