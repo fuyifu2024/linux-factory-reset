@@ -1,0 +1,2 @@
+Real UEFI VM restored, removed old users/data and created a new sudo administrator.
+Persistent restored-state verification passed.

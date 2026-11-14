@@ -1,0 +1,6 @@
+[   34.905715] lfr-qa[7652]:       "detail": "状态缺失、不可读或格式异常；无法确认，未按关闭处理",
+[   34.908078] lfr-qa[7652]:       "id": "secure_boot",
+[   34.908416] lfr-qa[7652]:       "status": "unknown"
+[   34.924436] lfr-qa[7652]:   "code": "checks-blocked",
+[   34.924448] lfr-qa[7652]:   "compatible": false,
+[   34.936573] lfr-qa[7652]:   "unknown_count": 1

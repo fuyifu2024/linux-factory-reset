@@ -1,0 +1,88 @@
+{
+  "application_version": "0.5.0-rc.2",
+  "checks": [
+    {
+      "detail": "ubuntu 26.04",
+      "id": "distribution",
+      "label": "发行版",
+      "status": "pass"
+    },
+    {
+      "detail": "ext4 普通分区",
+      "id": "root",
+      "label": "根分区",
+      "status": "pass"
+    },
+    {
+      "detail": "/boot/efi",
+      "id": "boot",
+      "label": "启动分区",
+      "status": "pass"
+    },
+    {
+      "detail": "x86_64-uefi",
+      "id": "layout",
+      "label": "完整布局与引导规则",
+      "status": "pass"
+    },
+    {
+      "detail": "没有待执行恢复",
+      "id": "pending",
+      "label": "待执行恢复",
+      "status": "pass"
+    },
+    {
+      "detail": "工具已找到；实际运行仍在后续步骤验证",
+      "id": "tools",
+      "label": "必需工具",
+      "status": "pass"
+    },
+    {
+      "detail": "已关闭",
+      "id": "secure_boot",
+      "label": "Secure Boot",
+      "status": "pass"
+    },
+    {
+      "detail": "挂载可写且启动顺序可读；未试写变量，不保证固件剩余容量",
+      "id": "efi_variables",
+      "label": "UEFI 变量访问",
+      "status": "pass"
+    },
+    {
+      "detail": "6490 MiB 可用",
+      "id": "root_space",
+      "label": "系统盘工作空间",
+      "status": "pass"
+    },
+    {
+      "detail": "504 MiB 可用",
+      "id": "boot_space",
+      "label": "启动盘工作空间",
+      "status": "pass"
+    },
+    {
+      "detail": "可用 30294 MiB；初步预留 4535 MiB，另需镜像导入暂存空间",
+      "id": "storage",
+      "label": "恢复盘与初步空间估算",
+      "status": "pass"
+    }
+  ],
+  "code": "checks-passed",
+  "compatible": true,
+  "failure_count": 0,
+  "note": "只读检查不会下载镜像、创建恢复目录、设置恢复标记或修改固件。空间为初步估算，不包含镜像导入/展开暂存；后续仍按实际镜像检查。",
+  "read_only": true,
+  "reason": "准备前检查通过；镜像内容和实际引导写入仍需后续验证。",
+  "recovery_free_bytes": 31766331392,
+  "recovery_required_bytes_estimate": 4756250624,
+  "restoration_verified": false,
+  "schema": 2,
+  "storage_checked": true,
+  "target": {
+    "distro": "ubuntu",
+    "platform": "x86_64-uefi",
+    "version_id": "26.04"
+  },
+  "unknown_count": 0
+}

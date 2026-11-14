@@ -1,0 +1,7 @@
+x86_64
+uid=1000(lfrqatest) gid=1000(lfrqatest) groups=1000(lfrqatest),27(sudo)
+root L 2026-10-16 0 99999 7 -1
+lfrqatest:x:1000:1000::/home/lfrqatest:/bin/bash
+
+LFR_VM_ACCOUNT_PASS 1
+LFR_VM_ALL_CYCLES_COMPLETE

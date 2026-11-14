@@ -4,9 +4,9 @@ The first stable release must state its supported distributions, architectures, 
 
 | Gate / 门槛 | Current evidence / 当前证据 |
 | --- | --- |
-| Native packages, ordinary-user CLI/GUI, upgrade ordering and exact-artifact compatibility / 原生安装包、普通用户界面、版本升级顺序与产物兼容 | RC.1: eight native builds/installations, two Ubuntu 26.04 artifact checks and Debian version ordering passed / RC.1 八组原生安装、两组兼容性及版本顺序通过 |
-| New GUI compatibility gate must accept a supported guest and refuse incompatible layouts before downloading / 新界面检查接受有效客体，并在下载前拒绝不兼容布局 | RC.1 passed: real GUI/UEFI successful path plus two native negative controller checks / RC.1 真实界面成功路径及双架构拒绝分支通过 |
-| Actual restore/reboot, old-user/file removal, first administrator, locked root, password-authenticated sudo / 实际恢复重启、旧资料删除、开户、root 锁定和 sudo | RC.1 fresh Ubuntu 26.04 AMD64 passed; Beta.1 ARM64 retained baseline / RC.1 新增 AMD64 验收通过，ARM64 沿用 Beta.1 |
+| Native packages, ordinary-user CLI/GUI, upgrade ordering and exact-artifact compatibility / 原生安装包、普通用户界面、版本升级顺序与产物兼容 | RC.2: eight native builds/installations, two Ubuntu 26.04 artifact checks and Debian upgrade ordering passed / RC.2 八组原生安装、两组兼容性及版本顺序通过 |
+| Preparation checks and actual stage/elapsed display / 完整准备前检查与真实阶段耗时 | RC.2: 11 checks passed in the real UEFI guest; GUI screenshot, silent-period heartbeat, blocker aggregation and unknown-state refusal retained / RC.2 实际客体 11 项通过，保留真实截图、静默心跳、问题汇总和未知状态拒绝证据 |
+| Actual restore/reboot, old-user/file removal, first administrator, locked root, password-authenticated sudo / 实际恢复重启、旧资料删除、开户、root 锁定和 sudo | RC.2 fresh Ubuntu 26.04 AMD64 passed. Fresh full ARM64 acceptance with expanded guards remains pending; Beta.1 ARM64 is a retained baseline / RC.2 新增 AMD64 通过，新检查下完整 ARM64 仍待验收，Beta.1 为旧基线 |
 | Repeated resets, real cancellation, corrupt-profile refusal and interrupted-write rollback / 连续恢复、实际取消、损坏镜像拒绝和断电回退 | Beta.1 AMD64 passed; repeat if the owning recovery code changes / 已通过，修改相关恢复代码时重新检查 |
 | A physical-device report for each hardware path claimed stable / 对宣称稳定的真机路径提供真机报告 | Missing; no destructive test on the user's Pi / 暂缺，不在用户树莓派执行破坏性测试 |
 | Installation, limits, backup/data-deletion instructions, reproducible build/source and checksums / 安装、限制、备份与删除说明、构建源码及校验清单 | Bilingual documentation and artifacts exist; audit before stable publication / 已有中英双语文档与产物，正式发布前复核 |

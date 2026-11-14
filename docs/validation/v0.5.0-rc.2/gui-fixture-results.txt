@@ -1,0 +1,4 @@
+2026-11-14T06:39:20.2725957Z Actual GUI controller stopped automatic preparation at the real read-only check, before catalog lookup or download selection.
+2026-11-14T06:39:22.9292208Z Actual GUI rendered stage changes and elapsed-time heartbeats; unknown stage markup was ignored.
+2026-11-14T06:39:23.9952758Z Actual GUI controller stopped automatic preparation at the real read-only check, before catalog lookup or download selection.
+2026-11-14T06:39:26.6476671Z Actual GUI rendered stage changes and elapsed-time heartbeats; unknown stage markup was ignored.

@@ -1,0 +1,4 @@
+Firmware code: /usr/share/OVMF/OVMF_CODE_4M.secboot.fd
+Private variable template: empty/unenrolled; guest must confirm SecureBoot=0.
+1286f2a3217d09b374d05951355d7a561c8bacecd74845c8a1fbb71a48c0de8d  /usr/share/OVMF/OVMF_CODE_4M.secboot.fd
+5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e  /var/lib/linux-reset-vm.i639qJ/vars.fd
