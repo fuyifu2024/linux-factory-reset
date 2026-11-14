@@ -23,9 +23,9 @@ static void show_text(const std::string& text) {
 }
 struct BusyDialog {
     pid_t pid = -1; int input = -1;
-    std::string phase, pending;
+    std::string phase, pending; bool observed;
     std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now(), changed = began, refreshed{};
-    explicit BusyDialog(const std::string& initial = "连接官网并读取镜像目录（单次请求最多90秒）") : phase(initial) {
+    explicit BusyDialog(const std::string& initial = "连接官网并读取镜像目录（单次请求最多90秒）", bool observed_operation = false) : phase(initial), observed(observed_operation) {
         int channel[2]; need(pipe2(channel, O_CLOEXEC) == 0, "Cannot open operation progress channel");
         if (fcntl(channel[1], F_SETFL, O_NONBLOCK) < 0) { close(channel[0]); close(channel[1]); throw Error("Cannot configure progress channel"); }
         pid = fork();
@@ -56,7 +56,9 @@ struct BusyDialog {
         refreshed = now;
         auto total = std::chrono::duration_cast<std::chrono::seconds>(now - began).count();
         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - changed).count();
-        auto text = "# 当前阶段：" + phase + "　｜阶段已用 " + std::to_string(elapsed) + " 秒　｜总用时 " + std::to_string(total) + " 秒\n";
+        auto text = "# 当前阶段：" + phase;
+        if (observed) text += "　｜阶段已用 " + std::to_string(elapsed) + " 秒　｜总用时 " + std::to_string(total) + " 秒";
+        text += '\n';
         // Nonblocking and <= PIPE_BUF: a slow/closed window cannot stall or cancel the backend.
         if (input >= 0) (void)::write(input, text.data(), text.size());
     }
@@ -73,7 +75,7 @@ static bool privileged(Args args, bool preview = false, bool show_success = true
     // Keep errors with the result, while also streaming progress to the terminal.
     // No invisible terminal password prompt: a desktop authorization agent is required.
     Result result;
-    { BusyDialog busy(initial); result = command(args, true, -1, true, true, true, 0, [&](const std::string& chunk) { busy.update(chunk); }); }
+    { BusyDialog busy(initial, true); result = command(args, true, -1, true, true, true, 0, [&](const std::string& chunk) { busy.update(chunk); }); }
     if (result.code != 0) {
         show_text("操作未完成，尚未获得成功结果。\n以下是实际错误，可直接复制反馈：\n\n" + result.text +
                   "\n若错误与权限验证有关，请确认桌面有权限验证代理，或改用终端 sudo linux-factory-reset。\n");
