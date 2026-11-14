@@ -12,6 +12,7 @@ function dialog() {
     const args=fs.readFileSync('/proc/'+pid+'/cmdline','utf8').split('\0').filter(Boolean).slice(1);
     const w=run('xdotool',['search','--onlyvisible','--pid',pid]).split('\n')[0];
     if(args.includes('--progress')) {
+      if(args.includes('--pulsate') && Date.now()-shotAt>5000) {shotAt=Date.now();run('xdotool',['windowraise',w]);run('scrot',['--overwrite',dir+'/preparation-progress.png']);}
       if(args.includes('--auto-close') && Date.now()-shotAt>5000) {shotAt=Date.now();run('xdotool',['windowraise',w]);run('scrot',['--overwrite',dir+'/download.png']);}
       continue;
     }

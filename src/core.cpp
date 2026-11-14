@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <poll.h>
 #include <openssl/evp.h>
 #include <regex>
 #include <sstream>
@@ -52,7 +53,8 @@ static std::string digest(const fs::path& path, const EVP_MD* algorithm, const s
 }
 std::string sha256(const fs::path& path, const std::function<void(uint64_t)>& progress) { return digest(path, EVP_sha256(), progress); }
 std::string sha512(const fs::path& path, const std::function<void(uint64_t)>& progress) { return digest(path, EVP_sha512(), progress); }
-Result command(const Args& args, bool capture, int stdout_fd, bool desktop, bool merge_errors, bool live_output, uint64_t output_limit) {
+Result command(const Args& args, bool capture, int stdout_fd, bool desktop, bool merge_errors, bool live_output, uint64_t output_limit,
+               const std::function<void(const std::string&)>& observer) {
     need(!args.empty(), "Empty command");
     fs::path exe;
     if (args[0].starts_with("/")) exe = args[0];
@@ -84,9 +86,18 @@ Result command(const Args& args, bool capture, int stdout_fd, bool desktop, bool
     if (capture) {
         close(pipes[1]); std::array<char, 8192> buf{};
         for (;;) {
+            if (observer) {
+                pollfd pending{pipes[0], POLLIN, 0}; int ready;
+                do { ready = poll(&pending, 1, 250); } while (ready < 0 && errno == EINTR);
+                // UI observers are advisory: a display failure must not interrupt the backend.
+                try { observer(""); } catch (...) {}
+                if (ready == 0) continue;
+                if (ready < 0) break;
+            }
             auto count = ::read(pipes[0], buf.data(), buf.size());
             if (count < 0 && errno == EINTR) continue;
             if (count <= 0) break;
+            if (observer) { try { observer(std::string(buf.data(), static_cast<size_t>(count))); } catch (...) {} }
             if (live_output) { std::cout.write(buf.data(), count); std::cout.flush(); }
             if (text.size() < 64 * 1024 * 1024) text.append(buf.data(), static_cast<size_t>(count));
         }

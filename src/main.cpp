@@ -14,7 +14,7 @@ static void help() {
     std::cout << "Linux Factory Reset " << uf::VERSION << " (C++20, experimental)\n"
         "  linux-factory-reset gui [--preview]\n"
         "  linux-factory-reset status\n"
-        "  linux-factory-reset check [--storage /mnt/recovery]  # read-only layout check\n"
+        "  linux-factory-reset check [--storage /mnt/recovery]  # read-only preparation checks\n"
         "  linux-factory-reset diagnose [--output NEWFILE]  # local, read-only report; no sudo\n"
         "  linux-factory-reset catalog\n"
         "  linux-factory-reset resolve --distro fedora --release stable --edition workstation --arch arm64\n"

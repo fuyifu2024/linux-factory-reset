@@ -44,8 +44,8 @@ grep -q '"report_schema": 1' "$fixture/state/report.json"
 grep -q '诊断报告已保存到本机' "$fixture/state/message"
 rm "$fixture/state/selected"
 runuser -u gui-smoke -- env GUI_FLOW_CHOICE=check GUI_FLOW_DIR="$fixture/state" "$app" gui
-grep -q '"read_only": true' "$fixture/state/message"
-grep -q '"restoration_verified": false' "$fixture/state/message"
+grep -q '准备前检查（只读）' "$fixture/state/message"
+grep -q '必需工具' "$fixture/state/message"
 mkdir -p /etc/ubuntu-reset
 old_mode=$(stat -c %a /etc/ubuntu-reset)
 printf '{}\n' >/etc/ubuntu-reset/state.json

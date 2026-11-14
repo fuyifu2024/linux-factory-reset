@@ -32,7 +32,7 @@ jobs:
       - name: Real HTTPS download and cancellation in disposable container
         run: sh tests/https.sh "$PWD/build/test-download"
       - name: Shell validation
-        run: shellcheck -e SC1091 boot/hook boot/local-bottom boot/restore.sh boot/reconcile.sh boot/relocate.sh firstboot/firstboot.sh tests/reconcile.sh tests/relocate.sh tests/https.sh tests/gui-flow.sh tests/gui-prepare-check.sh tests/diagnostics.sh
+        run: shellcheck -e SC1091 boot/hook boot/local-bottom boot/restore.sh boot/reconcile.sh boot/relocate.sh firstboot/firstboot.sh tests/reconcile.sh tests/relocate.sh tests/https.sh tests/gui-flow.sh tests/gui-prepare-check.sh tests/gui-progress.sh tests/diagnostics.sh
       - name: Package
         run: cd build && cpack -G DEB
       - name: Install package in disposable container (never arm reset)
@@ -61,13 +61,15 @@ jobs:
         run: sh tests/gui-flow.sh /usr/bin/linux-factory-reset
       - name: Refuse incompatible automatic preparation before download
         run: sh tests/gui-prepare-check.sh /usr/bin/linux-factory-reset
+      - name: Render preparation stages and elapsed time
+        run: sh tests/gui-progress.sh /usr/bin/linux-factory-reset
       - name: Collect distro-specific binary and package
         env:
           TASK_DISTRO: ${{ matrix.os.label }}
         run: |
           TASK_ARCH=$(dpkg --print-architecture)
           mkdir -p build/release
-          cp build/*.deb "build/release/linux-factory-reset_0.5.0-rc.1_${TASK_DISTRO}_${TASK_ARCH}.deb"
+          cp build/*.deb "build/release/linux-factory-reset_0.5.0-rc.2_${TASK_DISTRO}_${TASK_ARCH}.deb"
           cp build/linux-factory-reset "build/release/linux-factory-reset-${TASK_DISTRO}-linux-${TASK_ARCH}"
           strip "build/release/linux-factory-reset-${TASK_DISTRO}-linux-${TASK_ARCH}"
           cd build/release

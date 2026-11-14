@@ -1,10 +1,10 @@
 # Linux Factory Reset
 
-[English](README.en.md) · [下载 RC](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-rc.1) · [验证记录](docs/validation/v0.5.0-rc.1.md) · [反馈与建议](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
+[English](README.en.md) · [下载 RC](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-rc.2) · [验证记录](docs/validation/v0.5.0-rc.2.md) · [反馈与建议](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
 
 C++20 编写的 Linux 官方镜像下载与实验性恢复工具，恢复阶段使用少量 Shell。原名 `ubuntu-reset`，旧命令仍兼容。
 
-**v0.5.0-rc.1 正式版候选：** 欢迎按 [公测指南](docs/beta-testing.md) 在可丢弃虚拟机中体验，并提交错误和功能建议。下面明确区分已通过的验证和仍待验收的项目。
+**v0.5.0-rc.2 正式版候选：** 欢迎按 [公测指南](docs/beta-testing.md) 在可丢弃虚拟机中体验，并提交错误和功能建议。下面明确区分已通过的验证和仍待验收的项目。
 
 Ubuntu 26.04 AMD64 已完成真实 GUI 流程、连续两次恢复、新管理员与 sudo、断电回退。Debian 13、Fedora 45 AMD64 的真实恢复基线见验证记录。**2026-11-09，Ubuntu 26.04 ARM64 UEFI 也已完成实际恢复、重启、新管理员创建、密码认证 sudo，以及关机后的磁盘与临时副本清理检查。** 其他组合和物理硬件的验证范围请以记录为准。
 
@@ -34,6 +34,8 @@ linux-factory-reset gui
 统一界面提供“下载官方镜像”“准备恢复资料”“查看变更”“恢复系统”“取消恢复”。普通流程不需要自建 HTTPS 地址或手填校验值。默认 Cairo 软件绘制，兼容缺少虚拟 GPU 驱动的环境；不会修改系统图形配置。
 
 恢复前可先运行 `linux-factory-reset check --storage /mnt/recovery` 做只读布局初检；读取受限时可用 sudo 重试。界面自动准备会在下载镜像前检查布局和恢复盘。初检不会设置恢复标记，也不代替最终镜像、回退空间和引导检查。正式版剩余验收见 [清单](docs/stable-readiness.md)。
+
+RC.2 的准备前检查会汇总布局、工具、待恢复标记、Secure Boot、UEFI 变量访问、系统/启动盘工作空间和恢复盘空间估算；无法确认的必需项目会阻止准备。后台准备界面显示实际阶段、阶段耗时和总耗时；没有可计算的总体百分比时使用活动指示。下载仍可取消，准备与引导写入不提供强制中止。
 
 ## 下载与恢复
 

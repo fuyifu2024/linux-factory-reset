@@ -14,7 +14,7 @@ using json = nlohmann::json;
 using Args = std::vector<std::string>;
 struct Error : std::runtime_error { using std::runtime_error::runtime_error; };
 struct Result { int code; std::string text; };
-inline constexpr auto VERSION = "0.5.0-rc.1";
+inline constexpr auto VERSION = "0.5.0-rc.2";
 inline const fs::path STATE = "/etc/ubuntu-reset/state.json";
 inline const fs::path REQUEST = "/var/lib/ubuntu-reset/request";
 void need(bool condition, const std::string& message);
@@ -23,7 +23,10 @@ void write(const fs::path& path, const std::string& data);
 std::string sha512(const fs::path& path, const std::function<void(uint64_t)>& progress = {});
 std::string sha256(const fs::path& path, const std::function<void(uint64_t)>& progress = {});
 Result command(const Args& args, bool capture = true, int stdout_fd = -1, bool desktop = false,
-               bool merge_errors = false, bool live_output = false, uint64_t output_limit = 0);
+               bool merge_errors = false, bool live_output = false, uint64_t output_limit = 0,
+               const std::function<void(const std::string&)>& observer = {});
+void operation_stage(const std::string& code);
+std::string stage_label(const std::string& code);
 std::string output(const Args& args);
 void run(const Args& args);
 void root_only();
@@ -72,6 +75,10 @@ struct Mount {
 };
 json hardware();
 json check_environment(const fs::path& storage = {});
+std::string secure_boot_state(const fs::path& variables);
+json summarize_environment(json checks, bool storage_requested);
+std::string environment_text(const json& report);
+void require_environment(const fs::path& storage = {});
 json firmware_status();
 void firmware_reset(const std::string& confirm);
 void make_profile(const fs::path& root, const fs::path& boot, const std::string& platform,

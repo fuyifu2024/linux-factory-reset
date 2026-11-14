@@ -50,32 +50,6 @@ json hardware() {
     }
     return {{"platform", kind}, {"distro", os.at("id")}, {"version_id", os.at("version_id")}, {"root", root}, {"boot", fw}};
 }
-json check_environment(const fs::path& storage) {
-    json report{{"schema", 1}, {"application_version", VERSION}, {"read_only", true},
-        {"compatible", false}, {"storage_checked", false}, {"restoration_verified", false},
-        {"note", "Layout check only. Image integrity, capacity for rollback and boot preparation still require final preflight. / 仅检查布局；镜像完整性、回退空间及引导准备仍需最终检查。"}};
-    try {
-        auto hw = hardware();
-        report["target"] = {{"distro", hw.at("distro")}, {"version_id", hw.at("version_id")}, {"platform", hw.at("platform")},
-            {"root_filesystem", hw.at("root").at("fstype")}, {"boot_filesystem", hw.at("boot").at("fstype")}};
-        need(!fs::exists(REQUEST) && !fs::is_symlink(REQUEST), "Cancel the pending reset before preparing another profile");
-        if (!storage.empty()) {
-            auto selected = fs::canonical(storage);
-            need(fs::is_directory(selected), "Choose a directory on a mounted ext4 recovery volume");
-            auto info = filesystem(selected);
-            recovery_mount(selected, info, hw); // Same identity/layout rules as preparation, without creating a work directory.
-            report["storage_checked"] = true;
-            report["recovery_free_bytes"] = fs::space(selected).available;
-        }
-        report["compatible"] = true; report["code"] = "compatible-layout";
-        report["reason"] = storage.empty() ? "目标系统布局初检通过；尚未检查恢复盘。" : "目标布局与恢复盘初检通过，没有创建恢复资料或设置恢复标记。";
-    } catch (const std::exception& e) {
-        report["code"] = "layout-unavailable";
-        report["reason"] = "兼容性初检未通过，没有下载镜像或修改系统。\n" + std::string(e.what()) +
-            (geteuid() != 0 ? "\n若错误与读取权限有关，可用 sudo linux-factory-reset check 只读重试。" : "");
-    }
-    return report;
-}
 struct Storage {
     fs::path work; json fsinfo; json hw;
     explicit Storage(const fs::path& path) {
@@ -245,6 +219,7 @@ static void replace_all(std::string& text, const std::string& from, const std::s
     while ((i = text.find(from, i)) != std::string::npos) { text.replace(i, from.size(), to); i += to.size(); }
 }
 void make_profile(const fs::path& root, const fs::path& boot, const std::string& kind, const fs::path& dest, const json& provenance, const fs::path& firstboot_assets) {
+    operation_stage("normalizing");
     auto meta = reference(root, boot, kind, false);
     auto grubpath = meta.at("distro") == "fedora" ? "boot/grub2/grub.cfg" : "boot/grub/grub.cfg"; need(!fs::exists(dest), "Destination already exists");
     auto size = std::stoull(output({"du", "-sx", "--block-size=1", str(root)}));
@@ -355,9 +330,11 @@ void make_profile(const fs::path& root, const fs::path& boot, const std::string&
     meta["provenance"] = provenance; meta["semantics"] = "initial system; all personal accounts/data removed";
     write(stage.path / "profile.json", meta.dump(2) + "\n");
     reference(r, b, kind, true);
+    operation_stage("packing");
     run({"mksquashfs", str(stage.path), str(dest), "-noappend", "-comp", "zstd", "-processors", "2", "-no-progress"});
 }
 static void register_profile(const fs::path& profile, const Storage& st, const json& provenance) {
+    operation_stage("registering");
     no_pending(); auto id = random_id(); auto final = st.work / ("factory-" + id + ".squashfs");
     fs::rename(profile, final); fs::permissions(final, fs::perms::owner_read | fs::perms::owner_write);
     json state{{"schema", 2}, {"distro", st.hw["distro"]}, {"version_id", st.hw["version_id"]}, {"id", id}, {"platform", st.hw["platform"]}, {"root_uuid", st.hw["root"]["uuid"]},
@@ -372,6 +349,7 @@ struct Loop {
     ~Loop() { try { command({"losetup", "--detach", device}, false); } catch (...) {} }
 };
 static void import_disk_image(const fs::path& image, const fs::path& profile, const fs::path& work, const std::string& platform, const std::string& distro_expected, const json& provenance) {
+    operation_stage("inspecting");
     Loop loop(image); run({"udevadm", "settle"});
     auto parts = json::parse(output({"lsblk", "--json", "--tree", "-o", "PATH,FSTYPE", loop.device}));
     std::vector<std::string> roots, boots, btrfs;
@@ -490,14 +468,15 @@ static void snapshot_local_file(const fs::path& from, const fs::path& to) {
     } catch (...) { close(in); if (out >= 0) close(out); throw; }
 }
 void prepare_image(const fs::path& selected, const fs::path& location, const std::string& expected_sha256, const std::string& expected_sha512) {
-    root_only(); no_pending(); auto format = image_format(selected); Storage st(location); TempDir temp(st.work);
+    root_only(); no_pending(); auto format = image_format(selected); require_environment(location); Storage st(location); TempDir temp(st.work);
     auto snapshot = temp.path / "input", raw = temp.path / "disk.raw", profile = temp.path / "prepared.squashfs";
     need(expected_sha256.empty() || valid_sha(expected_sha256), "Invalid expected SHA-256");
     need(expected_sha512.empty() || std::regex_match(expected_sha512, std::regex("[0-9a-f]{128}")), "Invalid expected SHA-512");
-    snapshot_local_file(selected, snapshot);
-    need(expected_sha256.empty() || sha256(snapshot) == expected_sha256, "Official image changed before import (SHA-256 mismatch)");
+    operation_stage("copying"); snapshot_local_file(selected, snapshot);
+    operation_stage("verifying"); auto snapshot_sha256 = sha256(snapshot);
+    need(expected_sha256.empty() || snapshot_sha256 == expected_sha256, "Official image changed before import (SHA-256 mismatch)");
     need(expected_sha512.empty() || sha512(snapshot) == expected_sha512, "Official image changed before import (SHA-512 mismatch)");
-    json provenance{{"type", "local image"}, {"filename", selected.filename().string()}, {"sha256", sha256(snapshot)}, {"format", format},
+    json provenance{{"type", "local image"}, {"filename", selected.filename().string()}, {"sha256", snapshot_sha256}, {"format", format},
                     {"authentication", "User-selected local file; computed hash is integrity tracking, not proof of publisher identity"}};
     if (!expected_sha256.empty()) provenance["expected_sha256"] = expected_sha256;
     if (!expected_sha512.empty()) provenance["expected_sha512"] = expected_sha512;
@@ -510,6 +489,7 @@ void prepare_image(const fs::path& selected, const fs::path& location, const std
         check_profile(snapshot, st); register_profile(snapshot, st, provenance); return;
     }
     if (format == "raw-xz") {
+        operation_stage("decompressing");
         auto listing = output({"xz", "--robot", "--list", snapshot.string()});
         std::istringstream lines(listing); std::string line; uint64_t expanded = 0;
         while (std::getline(lines, line)) if (line.starts_with("totals\t")) {
@@ -519,6 +499,7 @@ void prepare_image(const fs::path& selected, const fs::path& location, const std
         int fd = open(raw.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600); need(fd >= 0, "无法展开本地镜像");
         auto rc = command({"xz", "--decompress", "--stdout", snapshot.string()}, false, fd, false, false, false, expanded).code; close(fd); need(rc == 0, "镜像解压失败");
     } else if (format == "qcow2") {
+        operation_stage("converting");
         auto info = json::parse(output({"qemu-img", "info", "--output=json", "-f", "qcow2", snapshot.string()}));
         need(!info.contains("backing-filename") && !info.contains("full-backing-filename") && !info.value("encrypted", false), "请先导出独立、未加密的完整虚拟磁盘镜像，不能使用增量快照");
         auto data = info.value("format-specific", json::object()).value("data", json::object());
@@ -534,16 +515,17 @@ json detected_sources() {
     catch (const Error& e) { return {{"automatic_available", false}, {"reason", e.what()}, {"iso_automatic_install", false}}; }
 }
 void prepare_automatic(const fs::path& location) {
-    root_only(); auto sources = detected_sources(); need(sources.at("automatic_available").get<bool>(), sources.at("reason"));
+    root_only(); require_environment(location); auto sources = detected_sources(); need(sources.at("automatic_available").get<bool>(), sources.at("reason"));
     std::cout << sources.at("reason").get<std::string>() << std::endl;
     Storage st(location); TempDir temporary(st.work);
     auto image = resolve_recovery(st.hw.at("distro"), st.hw.at("version_id"), st.hw.at("platform"), proxy);
     std::this_thread::sleep_for(std::chrono::seconds(6));
+    operation_stage("downloading");
     auto path = download_official(image, temporary.path, [](const TransferProgress& p) { std::cerr << "\r" << p.percent() << "%  " << p.text() << "       " << std::flush; return true; }, proxy);
     prepare_image(path, location, image.checksum_algorithm == "sha256" ? image.checksum : "", image.checksum_algorithm == "sha512" ? image.checksum : "");
 }
 void prepare_pi(const std::string& release, const fs::path& location) {
-    root_only(); no_pending(); Storage st(location); need(st.hw["platform"] == "raspi-arm64", "Official Pi images are only supported on Raspberry Pi 5");
+    root_only(); no_pending(); require_environment(location); Storage st(location); need(st.hw["platform"] == "raspi-arm64", "Official Pi images are only supported on Raspberry Pi 5");
     need(std::regex_match(release, std::regex("[0-9]{2}\\.[0-9]{2}(\\.[0-9]+)?")), "Invalid Ubuntu release");
     auto file = "ubuntu-" + release + "-preinstalled-desktop-arm64+raspi.img.xz";
     auto base = "https://cdimage.ubuntu.com/releases/" + release + "/release/"; std::string sum;
@@ -580,7 +562,8 @@ void prepare_pi(const std::string& release, const fs::path& location) {
     register_profile(profile, st, provenance);
 }
 void prepare_profile(const std::string& url, const std::string& sum, const fs::path& location) {
-    root_only(); no_pending(); need(valid_sha(sum), "Provide an independently trusted SHA-256 for the factory profile"); Storage st(location);
+    root_only(); no_pending(); need(valid_sha(sum), "Provide an independently trusted SHA-256 for the factory profile"); require_environment(location); Storage st(location);
+    operation_stage("downloading");
     auto profile = st.work / ("download-" + sum + ".squashfs"); download(url, profile, sum);
     check_profile(profile, st);
     register_profile(profile, st, {{"url", url}, {"sha256", sum}});
@@ -603,22 +586,24 @@ fs::path preflight(const json& s) {
     return path;
 }
 void plan(const json& s) {
+    operation_stage("verifying");
     root_only(); std::cout << "正在检查恢复磁盘与镜像完整性，这一步可能需要一些时间。\n" << std::flush;
     Mount source(preflight(s), "squashfs", "ro,loop,nosuid,nodev,noexec");
-    std::cout << "ROOT: this preview includes removal of all personal users and files.\n" << std::flush;
+    operation_stage("comparing"); std::cout << "ROOT: this preview includes removal of all personal users and files.\n" << std::flush;
     run({"rsync", "-aHAXxnci", "--numeric-ids", "--delete", "--exclude=/dev/***", "--exclude=/proc/***", "--exclude=/sys/***", "--exclude=/run/***", "--exclude=/boot/firmware/***", "--exclude=/boot/efi/***", "--exclude=/var/lib/ubuntu-reset/***", str(source.temp.path / "root") + "/", "/"});
     auto boot = s["platform"] == "raspi-arm64" ? "/boot/firmware/" : "/boot/efi/";
     std::cout << "BOOT:\n" << std::flush; run({"rsync", "-rtnci", "--delete", "--exclude=/EFI/LinuxFactoryReset/***", str(source.temp.path / "boot") + "/", boot});
     std::cout << "Preview only. UUID placeholders are replaced offline. Pending state is removed after successful restore.\n";
 }
 void arm(const json& s, const std::string& confirmation, bool reboot) {
-    root_only(); need(confirmation == "ERASE-ALL-USERS", "Requires --confirm ERASE-ALL-USERS"); no_pending(); auto profile = preflight(s);
+    root_only(); need(confirmation == "ERASE-ALL-USERS", "Requires --confirm ERASE-ALL-USERS"); no_pending(); require_environment(recorded_profile(s).parent_path()); operation_stage("verifying"); auto profile = preflight(s);
     if (state_distro(s) != "fedora") {
     need(fs::is_regular_file("/etc/initramfs-tools/hooks/ubuntu-reset") && fs::is_regular_file("/etc/initramfs-tools/scripts/local-bottom/ubuntu-reset"), "Install the recovery hooks first");
     secure("/etc/initramfs-tools/hooks/ubuntu-reset"); secure("/etc/initramfs-tools/scripts/local-bottom/ubuntu-reset");
     }
     atomic_write("/etc/ubuntu-reset/boot.conf", boot_config(s)); auto k = kernel();
     bool fedora = state_distro(s) == "fedora";
+    operation_stage("initramfs");
     if (fedora) run({"dracut", "--force", "--add", "linux-factory-reset", "--kver", k});
     else run({"update-initramfs", "-u", "-k", k});
     auto initrd = fs::path("/boot") / ((fedora ? "initramfs-" : "initrd.img-") + k + (fedora ? ".img" : ""));
@@ -634,14 +619,14 @@ void arm(const json& s, const std::string& confirmation, bool reboot) {
         need(sha256("/boot/firmware/current/initrd.img") == sha256(initrd), "flash-kernel did not update the active Pi initrd");
     } else {
         if (!fedora) need(read("/boot/grub/grub.cfg").find("initrd.img-" + k) != std::string::npos, "Current kernel initrd is not listed in GRUB");
-        install_rescue(s, profile, initrd, k);
+        operation_stage("rescue"); install_rescue(s, profile, initrd, k);
     }
-    atomic_write(REQUEST, s.at("id").get<std::string>() + "\n");
+    operation_stage("arming"); atomic_write(REQUEST, s.at("id").get<std::string>() + "\n");
     std::cout << "Reset armed with independent UEFI rescue and temporary rollback backup. Cancel before reboot: sudo ubuntu-reset cancel\n" << std::flush;
     if (reboot) run({"systemctl", "reboot"});
 }
 void cancel() {
-    root_only();
+    root_only(); operation_stage("cancelling");
     if (fs::exists(STATE)) {
         auto state = load_state();
         if (state.at("platform") != "raspi-arm64") {

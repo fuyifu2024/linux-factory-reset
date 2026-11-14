@@ -58,6 +58,30 @@ int main() {
         auto layout_report = json::parse(layout.text);
         check(layout_report.at("read_only").get<bool>() && !layout_report.at("restoration_verified").get<bool>(), "layout check never claims an actual restoration pass");
         check(!layout_report.at("storage_checked").get<bool>() && layout.code == (layout_report.at("compatible").get<bool>() ? 0 : 1), "layout-check exit code reflects compatibility and does not invent a storage check");
+        check(layout_report.at("checks").size() >= 8, "preparation checks collect independent results instead of stopping after the first blocker");
+        auto variables = tmp.path / "variables"; fs::create_directory(variables);
+        auto secure_var = variables / "SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c";
+        check(secure_boot_state(variables) == "unknown", "missing Secure Boot state is not assumed disabled");
+        write(secure_var, std::string(5, '\0'));
+        check(secure_boot_state(variables) == "disabled", "explicit disabled Secure Boot byte accepted");
+        auto enabled = std::string(5, '\0'); enabled[4] = 1; write(secure_var, enabled);
+        check(secure_boot_state(variables) == "enabled", "enabled Secure Boot detected");
+        write(secure_var, "bad");
+        check(secure_boot_state(variables) == "unknown", "truncated Secure Boot data does not pass");
+        auto bad = std::string(5, '\0'); bad[4] = 2; write(secure_var, bad);
+        check(secure_boot_state(variables) == "unknown", "undefined Secure Boot value does not pass");
+        json failures = json::array({{{"id", "tools"}, {"label", "必需工具"}, {"status", "fail"}, {"detail", "missing tools"}},
+            {{"id", "storage"}, {"label", "恢复盘"}, {"status", "fail"}, {"detail", "insufficient space"}},
+            {{"id", "secure_boot"}, {"label", "Secure Boot"}, {"status", "unknown"}, {"detail", "unreadable"}}});
+        auto combined = summarize_environment(failures, true);
+        check(!combined.at("compatible").get<bool>() && combined.at("failure_count") == 2 && combined.at("unknown_count") == 1, "multiple independent blockers and unknown state all prevent preparation");
+        auto summary = environment_text(combined);
+        check(summary.find("missing tools") != std::string::npos && summary.find("insufficient space") != std::string::npos && summary.find("unreadable") != std::string::npos, "user-facing check summary retains all blockers");
+        int ticks = 0; bool observed_first = false;
+        auto observed = command({"sh", "-c", "printf first; sleep 0.6; printf last; exit 7"}, true, -1, false, false, false, 0,
+            [&](const std::string& chunk) { if (chunk.empty()) ++ticks; if (chunk == "first") { observed_first = true; throw Error("display disconnected"); } });
+        check(observed_first && ticks >= 2 && observed.code == 7 && observed.text == "firstlast", "live output and silent-period heartbeat work; observer failure never interrupts the backend");
+        check(stage_label("packing") == "生成压缩恢复资料" && stage_label("<untrusted>").empty(), "only allowlisted stages can control progress labels");
         auto bounded_file = tmp.path / "bounded-output";
         int bounded_fd = open(bounded_file.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
         check(bounded_fd >= 0, "bounded output fixture opened");

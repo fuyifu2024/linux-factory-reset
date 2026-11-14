@@ -22,28 +22,58 @@ static void show_text(const std::string& text) {
     dialog({"--text-info", "--width=760", "--height=420", "--filename=" + path.string()});
 }
 struct BusyDialog {
-    pid_t pid = -1;
-    BusyDialog() {
+    pid_t pid = -1; int input = -1;
+    std::string phase, pending;
+    std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now(), changed = began, refreshed{};
+    explicit BusyDialog(const std::string& initial = "连接官网并读取镜像目录（单次请求最多90秒）") : phase(initial) {
+        int channel[2]; need(pipe2(channel, O_CLOEXEC) == 0, "Cannot open operation progress channel");
+        if (fcntl(channel[1], F_SETFL, O_NONBLOCK) < 0) { close(channel[0]); close(channel[1]); throw Error("Cannot configure progress channel"); }
         pid = fork();
         if (pid == 0) {
+            dup2(channel[0], STDIN_FILENO); close(channel[0]); close(channel[1]);
             execl("/usr/bin/zenity", "zenity", "--progress", "--pulsate", "--no-cancel",
-                  "--title=正在处理恢复资料", "--width=540",
-                  "--text=正在执行，请稍候。\n准备镜像或比较文件可能需要几分钟；详细进度会显示在启动终端中。", static_cast<char*>(nullptr));
+                  "--title=正在处理恢复资料", "--width=720",
+                  "--text=正在等待授权或启动操作，请稍候。", static_cast<char*>(nullptr));
             _exit(127);
         }
+        close(channel[0]); if (pid < 0) { close(channel[1]); throw Error("Cannot start operation progress display"); }
+        input = channel[1]; update("");
+    }
+    void update(const std::string& chunk) {
+        bool stage_changed = false;
+        // Only a small, allowlisted stage code controls the progress label. Raw logs/paths never become markup.
+        for (char c : chunk) {
+            if (c == '\n') {
+                if (pending.starts_with("LFR_STAGE ")) try {
+                    auto value = json::parse(pending.substr(10)); auto label = stage_label(value.at("stage").get<std::string>());
+                    if (!label.empty() && phase != label) { phase = label; changed = std::chrono::steady_clock::now(); stage_changed = true; }
+                } catch (const std::exception&) {}
+                pending.clear();
+            } else if (pending.size() < 4096) pending += c;
+        }
+        auto now = std::chrono::steady_clock::now();
+        if (!stage_changed && now - refreshed < std::chrono::seconds(1)) return;
+        refreshed = now;
+        auto total = std::chrono::duration_cast<std::chrono::seconds>(now - began).count();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - changed).count();
+        auto text = "# 当前阶段：" + phase + "　｜阶段已用 " + std::to_string(elapsed) + " 秒　｜总用时 " + std::to_string(total) + " 秒\n";
+        // Nonblocking and <= PIPE_BUF: a slow/closed window cannot stall or cancel the backend.
+        if (input >= 0) (void)::write(input, text.data(), text.size());
     }
     ~BusyDialog() {
+        if (input >= 0) close(input);
         if (pid > 0) { kill(pid, SIGTERM); int status = 0; while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {} }
     }
 };
 static bool privileged(Args args, bool preview = false, bool show_success = true) {
+    auto initial = args.at(0) == "plan" ? stage_label("verifying") : args.at(0) == "cancel" ? stage_label("cancelling") : stage_label("checking");
     args.insert(args.begin(), "/usr/bin/linux-factory-reset");
     args.insert(args.begin(), "--disable-internal-agent");
     args.insert(args.begin(), "/usr/bin/pkexec");
     // Keep errors with the result, while also streaming progress to the terminal.
     // No invisible terminal password prompt: a desktop authorization agent is required.
     Result result;
-    { BusyDialog busy; result = command(args, true, -1, true, true, true); }
+    { BusyDialog busy(initial); result = command(args, true, -1, true, true, true, 0, [&](const std::string& chunk) { busy.update(chunk); }); }
     if (result.code != 0) {
         show_text("操作未完成，尚未获得成功结果。\n以下是实际错误，可直接复制反馈：\n\n" + result.text +
                   "\n若错误与权限验证有关，请确认桌面有权限验证代理，或改用终端 sudo linux-factory-reset。\n");
@@ -148,14 +178,14 @@ int gui(bool preview) {
             "cancel", "取消待执行恢复", "重启前可取消",
             "advanced", "高级功能", "管理员恢复源、固件信息",
             "diagnose", "导出诊断报告", "无需管理员权限，仅保存到本机",
-            "check", "检查兼容性", "只读检查目标布局，不下载、不恢复"});
+            "check", "检查兼容性", "集中检查布局、工具、引导条件和空间"});
         if (choice.empty()) return 0;
         try {
             if ((choice == "plan" || choice == "restore") && !ready) {
                 show_text(status.at("reason")); continue;
             }
             if (choice == "download") official_download();
-            else if (choice == "check") show_text(check_environment().dump(2));
+            else if (choice == "check") show_text(environment_text(check_environment()));
             else if (choice == "diagnose") {
                 auto path = dialog({"--file-selection", "--save", "--filename=linux-factory-reset-diagnostics.json",
                     "--text=选择新的 JSON 文件名；已有文件不会覆盖。\n仅包含版本、系统、架构、文件系统类型、准备状态和工具是否可用。\n不包含用户名、个人路径、磁盘 UUID、镜像网址或日志，不会自动上传。"});
