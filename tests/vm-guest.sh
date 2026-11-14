@@ -30,6 +30,11 @@ fi
 # Fault injection alters only the disposable guest's installed test copy.
 check_work_before=no
 [[ ! -e /mnt/recovery/ubuntu-reset ]] || check_work_before=yes
+for variable in SecureBoot SetupMode; do
+    file="/sys/firmware/efi/efivars/$variable-8be4df61-93ca-11d2-aa0d-00e098032b8c"
+    printf '%s: ' "$variable"
+    if [[ -f $file ]]; then od -An -tx1 "$file"; else printf 'unavailable\n'; fi
+done | tee /mnt/recovery/firmware-state.txt
 linux-factory-reset check --storage /mnt/recovery | tee /mnt/recovery/layout-check.json
 test ! -e /var/lib/ubuntu-reset/request
 [[ $check_work_before == yes || ! -e /mnt/recovery/ubuntu-reset ]]

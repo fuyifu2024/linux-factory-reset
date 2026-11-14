@@ -21,6 +21,9 @@ cleanup() {
             mount -t ext4 -o ro,noload "$recovery_loop" "$work/recovery" 2>/dev/null || :
         fi
         if [ -d "$work/recovery/gui-evidence" ]; then cp -a "$work/recovery/gui-evidence" "$evidence/" || :; fi
+        for report in firmware-state.txt layout-check.json; do
+            if [ -f "$work/recovery/$report" ]; then cp "$work/recovery/$report" "$evidence/" || :; fi
+        done
     fi
     umount "$work/target-boot" 2>/dev/null || :
     umount "$work/target" 2>/dev/null || :
@@ -119,9 +122,13 @@ if [ "$arch" = arm64 ]; then
     set -- qemu-system-aarch64 -machine "virt,accel=$accel,gic-version=3" -cpu "$cpu" -device virtio-gpu-pci -device qemu-xhci -device usb-kbd
     code=/usr/share/AAVMF/AAVMF_CODE.fd
 else
-    set -- qemu-system-x86_64 -machine q35,accel=kvm -cpu host -vga std
-    code=/usr/share/OVMF/OVMF_CODE_4M.fd
+    # Secure-Boot-capable firmware with an empty, unenrolled variable template:
+    # the guest must report an actual disabled byte; missing state is not bypassed.
+    set -- qemu-system-x86_64 -machine q35,accel=kvm,smm=on -global driver=cfi.pflash01,property=secure,value=on -cpu host -vga std
+    code=/usr/share/OVMF/OVMF_CODE_4M.secboot.fd
 fi
+printf 'Firmware code: %s\nPrivate variable template: empty/unenrolled; guest must confirm SecureBoot=0.\n' "$code" >"$evidence/firmware.txt"
+sha256sum "$code" "$work/vars.fd" >>"$evidence/firmware.txt"
 "$@" -m 3072 -smp 2 -display none \
     -drive if=pflash,format=raw,readonly=on,file="$code" \
     -drive if=pflash,format=raw,file="$work/vars.fd" \
