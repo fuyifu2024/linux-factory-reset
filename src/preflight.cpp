@@ -55,7 +55,7 @@ json check_environment(const fs::path& storage) {
         auto rows = json::parse(output({"findmnt", "--json", "--target", path.string(), "-o", "TARGET,SOURCE,FSTYPE,UUID,OPTIONS"})).at("filesystems");
         need(rows.size() == 1, "无法确认挂载身份"); return rows.at(0);
     };
-    add("distribution", "发行版", [&] { auto os = distribution(read("/usr/lib/os-release")); distro = os.at("id"); return distro + " " + os.at("version_id").get<std::string>(); });
+    add("distribution", "发行版", [&] { auto os = distribution(read("/usr/lib/os-release")); distro = os.at("id").get<std::string>(); return distro + " " + os.at("version_id").get<std::string>(); });
     bool uefi = fs::is_directory("/sys/firmware/efi");
     try { if (!uefi && host_arch() == "arm64" && distro == "ubuntu" && read("/proc/device-tree/model").find("Raspberry Pi 5") != std::string::npos) boot = "/boot/firmware"; } catch (const std::exception&) {}
     add("root", "根分区", [&] {

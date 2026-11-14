@@ -68,7 +68,7 @@ int main() {
         check(secure_boot_state(variables) == "enabled", "enabled Secure Boot detected");
         write(secure_var, "bad");
         check(secure_boot_state(variables) == "unknown", "truncated Secure Boot data does not pass");
-        auto bad = std::string(5, '\0'); bad[4] = 2; write(secure_var, bad);
+        auto invalid_boot_byte = std::string(5, '\0'); invalid_boot_byte[4] = 2; write(secure_var, invalid_boot_byte);
         check(secure_boot_state(variables) == "unknown", "undefined Secure Boot value does not pass");
         json failures = json::array({{{"id", "tools"}, {"label", "必需工具"}, {"status", "fail"}, {"detail", "missing tools"}},
             {{"id", "storage"}, {"label", "恢复盘"}, {"status", "fail"}, {"detail", "insufficient space"}},
