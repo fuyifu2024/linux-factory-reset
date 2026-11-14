@@ -21,7 +21,12 @@ jobs:
       DEBIAN_FRONTEND: noninteractive
     steps:
       - name: Install build and fixture-test dependencies
-        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates git build-essential cmake file libssl-dev libcurl4-openssl-dev nlohmann-json3-dev rsync squashfs-tools shellcheck nodejs
+        run: |
+          # Debian slim intentionally excludes GTK's translations. GTK 3 uses its
+          # Arabic catalog to select RTL, so keep this prerequisite for GUI QA.
+          printf 'path-include=/usr/share/locale/ar*\n' > /etc/dpkg/dpkg.cfg.d/zz-lfr-arabic
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git build-essential cmake file libssl-dev libcurl4-openssl-dev nlohmann-json3-dev rsync squashfs-tools shellcheck nodejs
       - uses: actions/checkout@v4
       - name: Validate complete translation catalogs
         run: node tests/catalogs.mjs

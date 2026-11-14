@@ -39,7 +39,7 @@ Commands, JSON keys, stage codes, checksums, paths and this token are never tran
 
 ## Arabic and fonts / 阿拉伯语与字体
 
-Arabic uses actual GTK right-to-left layout, including list columns and dialog alignment. DEBs require `locales`; Ubuntu packages also require `language-pack-gnome-ar`. RPMs require `glibc-langpack-ar`. On minimal Debian systems with locale sources but no generated Arabic locale, the GUI runs `localedef` once into its own user cache (`$XDG_CACHE_HOME/linux-factory-reset/locales`, otherwise `~/.cache/linux-factory-reset/locales`). It never edits `/etc/locale.gen`, the system locale or firmware. If that locale cannot be created/loaded, Arabic GUI startup reports the missing requirement rather than silently using the wrong direction.
+Arabic uses actual GTK right-to-left layout, including list columns and dialog alignment. DEBs require `locales`; Ubuntu packages also require `language-pack-gnome-ar`. RPMs require `glibc-langpack-ar`. GTK 3 also needs its Arabic `gtk30.mo` catalog (normally supplied by `libgtk-3-common`); custom/slim images that strip `/usr/share/locale` must preserve/reinstall it. On minimal Debian systems with locale sources but no generated Arabic locale, the GUI runs `localedef` once into its own user cache (`$XDG_CACHE_HOME/linux-factory-reset/locales`, otherwise `~/.cache/linux-factory-reset/locales`). It never edits `/etc/locale.gen`, the system locale or firmware. If that locale cannot be created/loaded, Arabic GUI startup reports the missing requirement rather than silently using the wrong direction.
 
 阿拉伯语使用 GTK 实际的从右向左布局。DEB/RPM 自动声明相应语言依赖；精简 Debian 上可在当前用户缓存里生成阿拉伯语 locale，不修改系统默认语言。生成失败会明确报错。
 

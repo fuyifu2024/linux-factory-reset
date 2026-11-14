@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <dlfcn.h>
 #include <iostream>
+#include <locale.h>
 
 int main(int argc, char** argv) {
     try {
@@ -17,6 +18,7 @@ int main(int argc, char** argv) {
         else reinterpret_cast<void(*)(int*,char***)>(init)(nullptr, nullptr);
         auto direction = reinterpret_cast<int(*)()>(get_direction)();
         auto expected = uf::language() == "ar" ? 2 : 1;
+        std::cerr << "GTK" << (gtk4 ? 4 : 3) << " locale=" << setlocale(LC_ALL, nullptr) << " direction=" << direction << " expected=" << expected << '\n';
         uf::need(direction == expected, "Actual GTK widget direction does not match selected interface language");
         std::cout << uf::language() << " GTK" << (gtk4 ? 4 : 3) << ' ' << (direction == 2 ? "rtl" : "ltr") << '\n';
         // GTK owns process-lifetime objects; do not dlclose the library before exit.
