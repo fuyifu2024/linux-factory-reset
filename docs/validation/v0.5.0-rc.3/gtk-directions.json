@@ -1,0 +1,185 @@
+{
+  "source": "2760bd49230fcdc8ffa26e6c4d681d60f50862e0",
+  "checks": [
+    {
+      "group": "language-evidence-debian12-ubuntu-24.04",
+      "language": "en",
+      "observed": "en GTK3 ltr",
+      "screenshot_bytes": 56052
+    },
+    {
+      "group": "language-evidence-debian12-ubuntu-24.04",
+      "language": "zh",
+      "observed": "zh GTK3 ltr",
+      "screenshot_bytes": 75366
+    },
+    {
+      "group": "language-evidence-debian12-ubuntu-24.04",
+      "language": "hi",
+      "observed": "hi GTK3 ltr",
+      "screenshot_bytes": 63238
+    },
+    {
+      "group": "language-evidence-debian12-ubuntu-24.04",
+      "language": "es",
+      "observed": "es GTK3 ltr",
+      "screenshot_bytes": 57063
+    },
+    {
+      "group": "language-evidence-debian12-ubuntu-24.04",
+      "language": "ar",
+      "observed": "ar GTK3 rtl",
+      "screenshot_bytes": 54968
+    },
+    {
+      "group": "language-evidence-debian12-ubuntu-24.04-arm",
+      "language": "en",
+      "observed": "en GTK3 ltr",
+      "screenshot_bytes": 56052
+    },
+    {
+      "group": "language-evidence-debian12-ubuntu-24.04-arm",
+      "language": "zh",
+      "observed": "zh GTK3 ltr",
+      "screenshot_bytes": 75366
+    },
+    {
+      "group": "language-evidence-debian12-ubuntu-24.04-arm",
+      "language": "hi",
+      "observed": "hi GTK3 ltr",
+      "screenshot_bytes": 63238
+    },
+    {
+      "group": "language-evidence-debian12-ubuntu-24.04-arm",
+      "language": "es",
+      "observed": "es GTK3 ltr",
+      "screenshot_bytes": 57063
+    },
+    {
+      "group": "language-evidence-debian12-ubuntu-24.04-arm",
+      "language": "ar",
+      "observed": "ar GTK3 rtl",
+      "screenshot_bytes": 54968
+    },
+    {
+      "group": "language-evidence-debian13-ubuntu-24.04",
+      "language": "en",
+      "observed": "en GTK4 ltr",
+      "screenshot_bytes": 59124
+    },
+    {
+      "group": "language-evidence-debian13-ubuntu-24.04",
+      "language": "zh",
+      "observed": "zh GTK4 ltr",
+      "screenshot_bytes": 68684
+    },
+    {
+      "group": "language-evidence-debian13-ubuntu-24.04",
+      "language": "hi",
+      "observed": "hi GTK4 ltr",
+      "screenshot_bytes": 59763
+    },
+    {
+      "group": "language-evidence-debian13-ubuntu-24.04",
+      "language": "es",
+      "observed": "es GTK4 ltr",
+      "screenshot_bytes": 60190
+    },
+    {
+      "group": "language-evidence-debian13-ubuntu-24.04",
+      "language": "ar",
+      "observed": "ar GTK4 rtl",
+      "screenshot_bytes": 55555
+    },
+    {
+      "group": "language-evidence-debian13-ubuntu-24.04-arm",
+      "language": "en",
+      "observed": "en GTK4 ltr",
+      "screenshot_bytes": 59124
+    },
+    {
+      "group": "language-evidence-debian13-ubuntu-24.04-arm",
+      "language": "zh",
+      "observed": "zh GTK4 ltr",
+      "screenshot_bytes": 68684
+    },
+    {
+      "group": "language-evidence-debian13-ubuntu-24.04-arm",
+      "language": "hi",
+      "observed": "hi GTK4 ltr",
+      "screenshot_bytes": 59763
+    },
+    {
+      "group": "language-evidence-debian13-ubuntu-24.04-arm",
+      "language": "es",
+      "observed": "es GTK4 ltr",
+      "screenshot_bytes": 60190
+    },
+    {
+      "group": "language-evidence-debian13-ubuntu-24.04-arm",
+      "language": "ar",
+      "observed": "ar GTK4 rtl",
+      "screenshot_bytes": 55555
+    },
+    {
+      "group": "language-evidence-ubuntu24.04-ubuntu-24.04",
+      "language": "en",
+      "observed": "en GTK4 ltr",
+      "screenshot_bytes": 33615
+    },
+    {
+      "group": "language-evidence-ubuntu24.04-ubuntu-24.04",
+      "language": "zh",
+      "observed": "zh GTK4 ltr",
+      "screenshot_bytes": 52665
+    },
+    {
+      "group": "language-evidence-ubuntu24.04-ubuntu-24.04",
+      "language": "hi",
+      "observed": "hi GTK4 ltr",
+      "screenshot_bytes": 39039
+    },
+    {
+      "group": "language-evidence-ubuntu24.04-ubuntu-24.04",
+      "language": "es",
+      "observed": "es GTK4 ltr",
+      "screenshot_bytes": 33597
+    },
+    {
+      "group": "language-evidence-ubuntu24.04-ubuntu-24.04",
+      "language": "ar",
+      "observed": "ar GTK4 rtl",
+      "screenshot_bytes": 36173
+    },
+    {
+      "group": "language-evidence-ubuntu24.04-ubuntu-24.04-arm",
+      "language": "en",
+      "observed": "en GTK4 ltr",
+      "screenshot_bytes": 33615
+    },
+    {
+      "group": "language-evidence-ubuntu24.04-ubuntu-24.04-arm",
+      "language": "zh",
+      "observed": "zh GTK4 ltr",
+      "screenshot_bytes": 52665
+    },
+    {
+      "group": "language-evidence-ubuntu24.04-ubuntu-24.04-arm",
+      "language": "hi",
+      "observed": "hi GTK4 ltr",
+      "screenshot_bytes": 39039
+    },
+    {
+      "group": "language-evidence-ubuntu24.04-ubuntu-24.04-arm",
+      "language": "es",
+      "observed": "es GTK4 ltr",
+      "screenshot_bytes": 33597
+    },
+    {
+      "group": "language-evidence-ubuntu24.04-ubuntu-24.04-arm",
+      "language": "ar",
+      "observed": "ar GTK4 rtl",
+      "screenshot_bytes": 36173
+    }
+  ]
+}

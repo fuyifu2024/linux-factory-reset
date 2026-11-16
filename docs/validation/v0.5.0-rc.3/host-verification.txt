@@ -1,0 +1,8 @@
+Pass 5: Checking group summary information
+/dev/loop2p2: 102567/622592 files (0.1% non-contiguous), 582307/2490107 blocks
+tune2fs 1.47.0 (5-Feb-2023)
+Entered first-user field 1 after its actual prompt.
+Entered first-user field 2 after its actual prompt.
+Entered first-user field 3 after its actual prompt.
+Real UEFI VM restored, removed old users/data and created a new sudo administrator.
+Persistent restored-state verification passed.
