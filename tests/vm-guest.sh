@@ -1,6 +1,6 @@
 #!/bin/bash
 set -Eeuo pipefail
-trap 'echo LFR_VM_PREPARATION_FAIL >/dev/console; systemctl --no-block poweroff' ERR
+trap 'sync; echo LFR_VM_PREPARATION_FAIL >/dev/console; systemctl --no-block poweroff' ERR
 if [[ -f /etc/lfr-qa.conf ]]; then source /etc/lfr-qa.conf; fi
 mkdir -p /mnt/recovery
 mountpoint -q /mnt/recovery || mount -t ext4 "UUID=$REC_UUID" /mnt/recovery

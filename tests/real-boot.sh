@@ -120,7 +120,9 @@ if [ "$arch" = arm64 ]; then
     accel=tcg; cpu=cortex-a72
     if [ -c /dev/kvm ]; then accel=kvm; cpu=host; fi
     set -- qemu-system-aarch64 -machine "virt,accel=$accel,gic-version=3" -cpu "$cpu" -device virtio-gpu-pci -device qemu-xhci -device usb-kbd
-    code=/usr/share/AAVMF/AAVMF_CODE.fd
+    # The default image can omit SecureBoot and SetupMode entirely. Use the
+    # secure-capable image with the private, empty variable template above.
+    code=/usr/share/AAVMF/AAVMF_CODE.secboot.fd
 else
     # Secure-Boot-capable firmware with an empty, unenrolled variable template:
     # the guest must report an actual disabled byte; missing state is not bypassed.
