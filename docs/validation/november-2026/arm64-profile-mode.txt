@@ -1,0 +1,2 @@
+Official download/checksum and production conversion ran natively on ARM64.
+Guest imports this prepared profile and performs actual rescue, restore, reboot and first-user setup.

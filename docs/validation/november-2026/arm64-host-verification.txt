@@ -1,0 +1,10 @@
+ARM recovery phase: LFR_VM_READY_TO_ARM
+ARM recovery phase: Ubuntu Reset: verifying recovery media; do not remove power.
+ARM recovery phase: Linux Factory Reset: saving temporary rollback copy.
+ARM recovery phase: Ubuntu Reset: removing users/data and restoring initial system files.
+ARM recovery phase: Ubuntu Reset complete. Restarting into initial setup.
+Entered first-user field 1 after its actual prompt.
+Entered first-user field 2 after its actual prompt.
+Entered first-user field 3 after its actual prompt.
+Real UEFI VM restored, removed old users/data and created a new sudo administrator.
+Persistent restored-state verification passed.

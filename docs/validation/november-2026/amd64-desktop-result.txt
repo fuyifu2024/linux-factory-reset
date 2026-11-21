@@ -1,0 +1,6 @@
+Optional desktop setup after signing in / 登录后可选装桌面
+  sudo apt update && sudo apt install ubuntu-desktop-minimal
+  sudo systemctl set-default graphical.target
+Setting up gdm3 (50.1-0ubuntu0.1) ...
+Setting up ubuntu-desktop-minimal (1.570.4) ...
+LFR_VM_DESKTOP_PASS
