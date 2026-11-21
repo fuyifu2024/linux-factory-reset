@@ -14,7 +14,7 @@ using json = nlohmann::json;
 using Args = std::vector<std::string>;
 struct Error : std::runtime_error { using std::runtime_error::runtime_error; };
 struct Result { int code; std::string text; };
-inline constexpr auto VERSION = "0.5.0-rc.3";
+inline constexpr auto VERSION = "0.5.0";
 void set_language(const std::string& requested = "");
 std::string language();
 std::string normalize_language(const std::string& value);

@@ -1,12 +1,12 @@
 # Linux Factory Reset
 
-[English](README.en.md) · [下载 RC](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-rc.3) · [验证记录](docs/validation/v0.5.0-rc.3.md) · [反馈与建议](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
+[English](README.en.md) · [下载 v0.5.0](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0) · [验证记录](docs/validation/v0.5.0.md) · [反馈与建议](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
 
-C++20 编写的 Linux 官方镜像下载与实验性恢复工具，恢复阶段使用少量 Shell。原名 `ubuntu-reset`，旧命令仍兼容。
+C++20 编写的 Linux 官方镜像下载与系统恢复工具，恢复阶段使用少量 Shell。原名 `ubuntu-reset`，旧命令仍兼容。
 
-**v0.5.0-rc.3 正式版候选：** 欢迎按 [公测指南](docs/beta-testing.md) 在可丢弃虚拟机中体验，并提交错误和功能建议。下面明确区分已通过的验证和仍待验收的项目。
+**v0.5.0 稳定恢复范围为 Ubuntu 26.04 UEFI 虚拟机。** AMD64 验证了图形界面自动准备和完整恢复；ARM64 验证了命令行导入已转换恢复资料、离线恢复及开户。
 
-Ubuntu 26.04 AMD64 已完成真实 GUI 流程、连续两次恢复、新管理员与 sudo、断电回退。Debian 13、Fedora 45 AMD64 的真实恢复基线见验证记录。**2026-11-09，Ubuntu 26.04 ARM64 UEFI 也已完成实际恢复、重启、新管理员创建、密码认证 sudo，以及关机后的磁盘与临时副本清理检查。** 其他组合和物理硬件的验证范围请以记录为准。
+稳定范围要求标准 GRUB、普通 ext4 根分区、独立 FAT ESP、单独 ext4 恢复盘及已关闭的 Secure Boot。真机和其他发行版的恢复仍属实验性。下表列出功能与布局能力，实际验收范围见 [验证记录](docs/validation/v0.5.0.md)。
 
 | 功能 | 范围 |
 | --- | --- |
@@ -27,7 +27,7 @@ Ubuntu 26.04 AMD64 已完成真实 GUI 流程、连续两次恢复、新管理�
 
 ## 安装
 
-从发布页选择与发行版、架构匹配的包。提供 Debian 12/13、Ubuntu 24.04 的 AMD64/ARM64 DEB，以及 Fedora 45 的双架构 RPM；单独二进制需要对应运行库。请以所下载 tag 的功能与验收范围为准。
+从发布页选择与发行版、架构匹配的包。提供 Debian 12/13、Ubuntu 24.04 构建的 AMD64/ARM64 DEB（同一包通过 Ubuntu 26.04 兼容性检查），以及 Fedora 45 的双架构 RPM；单独二进制需要对应运行库。请以所下载 tag 的功能与验收范围为准。
 
 ```sh
 sudo apt install ./linux-factory-reset_*.deb
@@ -39,7 +39,7 @@ linux-factory-reset gui
 
 恢复前可先运行 `linux-factory-reset check --storage /mnt/recovery` 做只读布局初检；读取受限时可用 sudo 重试。界面自动准备会在下载镜像前检查布局和恢复盘。初检不会设置恢复标记，也不代替最终镜像、回退空间和引导检查。正式版剩余验收见 [清单](docs/stable-readiness.md)。
 
-RC.2 的准备前检查会汇总布局、工具、待恢复标记、Secure Boot、UEFI 变量访问、系统/启动盘工作空间和恢复盘空间估算；无法确认的必需项目会阻止准备。后台准备界面显示实际阶段、阶段耗时和总耗时；没有可计算的总体百分比时使用活动指示。下载仍可取消，准备与引导写入不提供强制中止。
+准备前检查会汇总布局、工具、待恢复标记、Secure Boot、UEFI 变量访问、系统/启动盘工作空间和恢复盘空间估算；无法确认的必需项目会阻止准备。后台准备界面显示实际阶段、阶段耗时和总耗时；没有可计算的总体百分比时使用活动指示。下载仍可取消，准备与引导写入不提供强制中止。
 
 ## 下载与恢复
 

@@ -27,11 +27,28 @@ jobs:
           test ! -e /var/lib/ubuntu-reset/request
       - name: Diagnose inaccessible state as an ordinary user
         run: sh tests/diagnostics.sh /usr/bin/linux-factory-reset
+      - name: Upgrade the published RC.3 to the final RPM
+        run: |
+          arch=$(rpm --eval '%{_arch}')
+          case "$arch" in
+            x86_64) hash=f7a85d7d2257cd278989c6d8776bb7c8713cdc116284b3104c905568e6ed14c0 ;;
+            aarch64) hash=f3b1c0aa35e73bbab4fb359e07273dee3ba18a72311695168db8985f06499587 ;;
+            *) exit 1 ;;
+          esac
+          curl -fsSL --retry 2 "https://github.com/fuyifu2024/linux-factory-reset/releases/download/v0.5.0-rc.3/linux-factory-reset_0.5.0-rc.3_fedora45_$arch.rpm" -o /tmp/lfr-previous.rpm
+          printf '%s  %s\n' "$hash" /tmp/lfr-previous.rpm | sha256sum -c
+          rpm -e linux-factory-reset
+          dnf install -y /tmp/lfr-previous.rpm
+          test "$(linux-factory-reset --version)" = 0.5.0-rc.3
+          dnf upgrade -y ./build/*.rpm
+          test "$(rpm -q --qf '%{VERSION}-%{RELEASE}' linux-factory-reset)" = 0.5.0-1
+          test "$(linux-factory-reset --version)" = 0.5.0
+          test ! -e /var/lib/ubuntu-reset/request
       - name: Collect release artifacts
         run: |
           TASK_ARCH=$(rpm --eval '%{_arch}')
           mkdir -p build/release
-          cp build/*.rpm "build/release/linux-factory-reset_0.5.0-rc.3_fedora45_${TASK_ARCH}.rpm"
+          cp build/*.rpm "build/release/linux-factory-reset_0.5.0_fedora45_${TASK_ARCH}.rpm"
           cp build/linux-factory-reset "build/release/linux-factory-reset-fedora45-linux-${TASK_ARCH}"
           strip "build/release/linux-factory-reset-fedora45-linux-${TASK_ARCH}"
           cd build/release

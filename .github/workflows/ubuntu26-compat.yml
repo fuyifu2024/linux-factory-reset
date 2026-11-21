@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       ci_run:
-        description: Exact successful Build and test run containing release candidates
+        description: Successful Build and test run containing the release packages
         required: true
         type: string
 permissions:
@@ -17,8 +17,10 @@ jobs:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
     container: ubuntu:26.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
-      - run: apt-get update && apt-get install -y --no-install-recommends ca-certificates
+      - run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
@@ -31,12 +33,36 @@ jobs:
           cd candidates
           sha256sum -c SHA256SUMS-*
           apt-get install -y --no-install-recommends ./*.deb
-          linux-factory-reset --version
+          test "$(linux-factory-reset --version)" = 0.5.0
           linux-factory-reset gui --preview
           linux-factory-reset diagnose
           chmod +x linux-factory-reset-ubuntu24.04-linux-*
-          ./linux-factory-reset-ubuntu24.04-linux-* --version
+          test "$(./linux-factory-reset-ubuntu24.04-linux-* --version)" = 0.5.0
           test ! -e /var/lib/ubuntu-reset/request
+      - name: Upgrade the published RC.3 to the exact stable DEB
+        run: |
+          arch=$(dpkg --print-architecture)
+          case "$arch" in
+            amd64) hash=337f27b0b8f293736bc1a982f30f3907b7e02ae83257377a393d7568f55c041b ;;
+            arm64) hash=6ec74adbeaf7ef5d7860a7725db65efa72377e87ddb4859d2287b06566d2a1d2 ;;
+            *) exit 1 ;;
+          esac
+          curl -fsSL --retry 2 "https://github.com/fuyifu2024/linux-factory-reset/releases/download/v0.5.0-rc.3/linux-factory-reset_0.5.0-rc.3_ubuntu24.04_$arch.deb" -o /tmp/lfr-previous.deb
+          printf '%s  %s\n' "$hash" /tmp/lfr-previous.deb | sha256sum -c
+          apt-get remove -y linux-factory-reset
+          apt-get install -y --no-install-recommends /tmp/lfr-previous.deb
+          test "$(linux-factory-reset --version)" = 0.5.0-rc.3
+          mkdir -p /etc/ubuntu-reset
+          printf '%s\n' '{"schema":2,"distro":"ubuntu","platform":"x86_64-uefi","root_uuid":"1111-2222","boot_uuid":"3333-4444","store_uuid":"5555-6666","id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","file":"ubuntu-reset/factory-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.squashfs"}' > /tmp/state-before-upgrade.json
+          install -m 644 /tmp/state-before-upgrade.json /etc/ubuntu-reset/state.json
+          linux-factory-reset status
+          apt-get install -y --no-install-recommends ./candidates/*.deb
+          test "$(dpkg-query -W -f='${Version}' linux-factory-reset)" = 0.5.0
+          test "$(linux-factory-reset --version)" = 0.5.0
+          cmp /tmp/state-before-upgrade.json /etc/ubuntu-reset/state.json
+          linux-factory-reset status
+          test ! -e /var/lib/ubuntu-reset/request
+          rm /etc/ubuntu-reset/state.json
       - name: Verify installed artifact blocks incompatible automatic preparation
         run: |
           useradd --create-home gui-smoke

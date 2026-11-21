@@ -11,7 +11,7 @@
 static volatile std::sig_atomic_t download_interrupted = 0;
 static void stop_download(int) { download_interrupted = 1; }
 static void help() {
-    std::cout << "Linux Factory Reset " << uf::VERSION << " (C++20, " << uf::tr("cli.experimental") << ")\n"
+    std::cout << "Linux Factory Reset " << uf::VERSION << " (C++20)\n" << uf::tr("cli.scope") << '\n' <<
         "  linux-factory-reset gui [--preview]\n"
         "  linux-factory-reset languages\n"
         "  linux-factory-reset status\n"

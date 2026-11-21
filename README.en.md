@@ -1,12 +1,12 @@
 # Linux Factory Reset
 
-[中文](README.md) · [Download RC](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0-rc.3) · [Validation evidence](docs/validation/v0.5.0-rc.3.md) · [Feedback and suggestions](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
+[中文](README.md) · [Download v0.5.0](https://github.com/fuyifu2024/linux-factory-reset/releases/tag/v0.5.0) · [Validation evidence](docs/validation/v0.5.0.md) · [Feedback and suggestions](https://github.com/fuyifu2024/linux-factory-reset/issues/new/choose)
 
-A C++20 official-image downloader and experimental Linux recovery tool, with small offline Shell components. Previously named `ubuntu-reset`; the old command remains compatible.
+A C++20 official-image downloader and Linux recovery tool, with small offline Shell components. Previously named `ubuntu-reset`; the old command remains compatible.
 
-**v0.5.0-rc.3 release candidate:** follow the [testing guide](docs/beta-testing.md) in a disposable VM and report bugs or suggestions. Completed checks and remaining validation gaps are listed separately below.
+**v0.5.0 provides stable recovery for Ubuntu 26.04 UEFI virtual machines.** AMD64 was validated with automatic preparation and a complete GUI restore. ARM64 was validated with CLI import of a prepared profile and a complete offline restore.
 
-Ubuntu 26.04 AMD64 completed the real GUI flow, two successive restorations, new-administrator/sudo checks and interrupted-write rollback. Debian 13 and Fedora 45 AMD64 restoration baselines are linked in the evidence. **On 2026-11-09, Ubuntu 26.04 ARM64 UEFI also completed actual restoration, reboot, new-administrator creation, password-authenticated sudo and powered-off disk/temporary-backup checks.** Consult the record for other combinations and physical-hardware limits.
+The stable scope requires standard GRUB, a plain ext4 root, a dedicated FAT ESP, a separate ext4 recovery disk and Secure Boot disabled. Physical-device recovery and recovery on other distributions are experimental. The table describes feature availability. Consult the [validation record](docs/validation/v0.5.0.md) for tested combinations.
 
 | Feature | Scope |
 | --- | --- |
@@ -27,7 +27,7 @@ After recovery from a generic image, sign in with the new administrator and inst
 
 ## Install
 
-Choose the package matching your distribution and architecture. Builds cover Debian 12/13 and Ubuntu 24.04 AMD64/ARM64 DEBs, plus Fedora 45 RPMs for both architectures. Standalone binaries need matching runtime libraries. Use the capabilities and evidence of the tag you download.
+Choose the package matching your distribution and architecture. Builds cover Debian 12/13 and Ubuntu 24.04-built AMD64/ARM64 DEBs (also validated on Ubuntu 26.04), plus Fedora 45 RPMs for both architectures. Standalone binaries need matching runtime libraries. Use the capabilities and evidence of the tag you download.
 
 ```sh
 sudo apt install ./linux-factory-reset_*.deb
@@ -39,7 +39,7 @@ The shared interface provides official downloads, recovery preparation, change p
 
 Before preparation, run `linux-factory-reset check --storage /mnt/recovery` for a read-only layout check; retry with sudo if access is denied. GUI automatic preparation checks layout/storage before downloading an image. This never schedules a reset and does not replace final image, rollback-capacity and boot checks. See the [stable-release checklist](docs/stable-readiness.md).
 
-RC.2 aggregates layout, tools, pending-reset state, Secure Boot, UEFI-variable access, root/boot working space and estimated recovery capacity. Unverifiable required conditions block preparation. Background preparation shows actual stages, stage elapsed time and total elapsed time; activity is shown without an invented overall percentage. Download cancellation remains available; preparation and boot-writing operations do not offer forced termination.
+Preparation preflight aggregates layout, tools, pending-reset state, Secure Boot, UEFI-variable access, root/boot working space and estimated recovery capacity. Unverifiable required conditions block preparation. Background preparation shows actual stages, stage elapsed time and total elapsed time; activity is shown without an invented overall percentage. Download cancellation remains available; preparation and boot-writing operations do not offer forced termination.
 
 ## Download and recover
 
