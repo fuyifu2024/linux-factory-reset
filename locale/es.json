@@ -164,5 +164,18 @@
   "error.storage_ext4": "La ubicación no está en un volumen ext4. Elija otro volumen ext4 montado; no se formatean discos automáticamente.",
   "error.storage_readonly": "El volumen es de solo lectura. Móntelo con escritura y vuelva a intentarlo.",
   "error.shared_esp": "No se admite una partición EFI compartida u OEM; no se borrarán archivos de arranque de otro sistema o fabricante.",
-  "error.grub": "Se requiere la distribución estándar de GRUB y del directorio EFI de la distribución."
+  "error.grub": "Se requiere la distribución estándar de GRUB y del directorio EFI de la distribución.",
+  "error.https": "Falló la solicitud HTTPS. Comprueba la conexión a Internet y vuelve a intentarlo.",
+  "error.https_dns": "No se pudo resolver el nombre del servidor de descargas o del proxy. Comprueba la configuración de DNS y del proxy.",
+  "error.https_connect": "No se pudo conectar con el servidor de descargas o el proxy. Comprueba la conexión y la dirección del proxy.",
+  "error.https_timeout": "El servidor de descargas o el proxy tardó demasiado en responder. Comprueba la conexión y vuelve a intentarlo.",
+  "error.https_cert": "No se pudo verificar el certificado HTTPS. Comprueba la hora del sistema y los certificados de confianza antes de volver a intentarlo.",
+  "error.https_http": "El servidor de descargas rechazó la solicitud. Consulta el estado HTTP indicado abajo. Si es 404, prueba con otra imagen oficial.",
+  "error.auth_cancelled": "Se canceló la autenticación de administrador.",
+  "error.auth_unavailable": "No se pudo completar la autenticación de administrador. Consulta el error original abajo.",
+  "prepare.desktop_after": "El escritorio es opcional. Tras la restauración, inicia sesión con la nueva cuenta de administrador y sigue las instrucciones de la consola para instalarlo.",
+  "error.download_space": "No hay espacio suficiente en el disco de descargas. Elige una carpeta en un disco con más espacio libre.",
+  "error.download_checksum": "La suma de verificación de la imagen no coincide. Se eliminó la descarga temporal. Vuelve a descargar la imagen.",
+  "error.download_temp": "No se pudo crear el archivo temporal. Comprueba que puedes escribir en la carpeta y que queda espacio libre.",
+  "error.download_write": "No se pudo escribir la descarga. Comprueba el espacio libre y que el disco sigue conectado."
 }

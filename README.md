@@ -23,6 +23,8 @@ Ubuntu 26.04 AMD64 已完成真实 GUI 流程、连续两次恢复、新管理�
 
 支持 **英语、简体中文、印地语、西班牙语、阿拉伯语**，自动跟随系统，也可在主界面“语言”中切换。例：`linux-factory-reset gui --language zh`。阿拉伯语支持从右向左布局；所有语言统一输入 `ERASE-ALL-USERS` 确认清空。[语言说明](docs/languages.md)。
 
+通用镜像恢复后可用新管理员登录，再按发行版安装桌面。[恢复后安装桌面](docs/desktop-after-reset.md)。
+
 ## 安装
 
 从发布页选择与发行版、架构匹配的包。提供 Debian 12/13、Ubuntu 24.04 的 AMD64/ARM64 DEB，以及 Fedora 45 的双架构 RPM；单独二进制需要对应运行库。请以所下载 tag 的功能与验收范围为准。

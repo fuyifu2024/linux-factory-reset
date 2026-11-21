@@ -18,6 +18,22 @@ read -r cycle </mnt/recovery/qa-cycle
             if getent passwd lfrqatest && id -nG lfrqatest | grep -Eq "(^| )(sudo|wheel)( |$)" && test "$root_locked" -eq 1 && printf "%s\n" qa7reset92factory | runuser -u lfrqatest -- sudo -S -k -p "" /usr/bin/id -u | grep -qx 0; then echo PASS >/var/lib/lfr-qa-result; sync; echo "LFR_VM_ACCOUNT_PASS $cycle"; else echo FAIL >/var/lib/lfr-qa-result; sync; echo LFR_VM_NEW_USER_FAIL; fi
             cp /var/lib/lfr-qa-result "/mnt/recovery/cycle-$cycle-result"
             cp /var/lib/lfr-qa-diagnostics "/mnt/recovery/cycle-$cycle-diagnostics"
+            if [[ ${REC_DESKTOP:-no} == yes ]] && grep -qx PASS /var/lib/lfr-qa-result; then
+                echo 'Installing the optional Ubuntu desktop after verified account setup.'
+                export DEBIAN_FRONTEND=noninteractive
+                if apt-get -o APT::Update::Error-Mode=any update &&
+                    apt-get install -y ubuntu-desktop-minimal &&
+                    dpkg-query -W -f='${Status}\n' ubuntu-desktop-minimal gdm3 | grep -cx 'install ok installed' | grep -qx 2 &&
+                    systemctl set-default graphical.target &&
+                    [[ $(systemctl get-default) == graphical.target ]]; then
+                    echo PASS >/var/lib/lfr-qa-desktop-result
+                    echo LFR_VM_DESKTOP_PASS
+                else
+                    echo LFR_VM_DESKTOP_FAIL
+                    systemctl --no-block poweroff
+                    exit 1
+                fi
+            fi
             sync
             if grep -qx PASS /var/lib/lfr-qa-result && (( cycle < REC_CYCLES )); then
                 echo "LFR_VM_CYCLE_PASS $cycle"

@@ -56,3 +56,9 @@ Translated content covers the application menu, preparation/restore warnings, co
 Catalogs live in `locale/*.json`; no runtime network translation is used. Keep identical keys and named placeholders, preserve deletion meaning, then run `node tests/catalogs.mjs`. Cloud tests check all five catalogs and confirmation paths, and render actual GTK 3/4 interfaces. Hindi, Spanish and Arabic wording would benefit from native-speaker review; reports and corrections are welcome through GitHub Issues.
 
 文案位于 `locale/*.json`，无在线翻译请求。请保持键名及占位符一致，并运行校验脚本；欢迎母语使用者在 Issues 提交措辞改进。
+
+## Review the deletion warnings / 清空提示校对
+
+For Hindi, Spanish and Arabic, compare `restore.warning`, `cli.erase`, `error.auth_cancelled` and `recovery.cancelled` with the English catalog. Check that the warning covers all old accounts, personal files, additional software and settings. Verify that scheduling a reset, cancelling it and finishing a reset are worded differently. Keep `{token}` intact and check that `ERASE-ALL-USERS` reads in order in the actual confirmation dialog. If a phrase is unclear, report the language code, catalog key, proposed wording and its meaning. A read-only preview is available with `linux-factory-reset gui --preview --language ar`. Review screenshots in a disposable VM.
+
+印地语、西语和阿语校对请优先对照上面四个键。确认警告覆盖全部旧账号、个人文件、额外软件及设置，且能区分安排、取消与完成恢复。保留 `{token}`，检查阿语确认窗口中的英文口令顺序。反馈时附语言代码、文案键、建议译文及含义。窗口截图请在可丢弃虚拟机中测试。[Translation feedback / 翻译反馈](https://github.com/fuyifu2024/linux-factory-reset/issues/new?template=bug.yml)

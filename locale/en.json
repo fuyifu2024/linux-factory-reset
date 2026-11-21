@@ -164,5 +164,18 @@
   "error.storage_ext4": "The location is not on an ext4 recovery volume. Select another mounted ext4 volume; disks are never formatted automatically.",
   "error.storage_readonly": "The recovery volume is read-only. Mount it writable and retry.",
   "error.shared_esp": "Shared/OEM EFI partition is unsupported; recovery will not delete another OS or vendor's boot files",
-  "error.grub": "Target must use its distribution's standard GRUB + EFI vendor-directory layout"
+  "error.grub": "Target must use its distribution's standard GRUB + EFI vendor-directory layout",
+  "error.https": "The HTTPS request failed. Check your internet connection and retry.",
+  "error.https_dns": "Could not look up the download server or proxy. Check your DNS and proxy settings.",
+  "error.https_connect": "Could not connect to the download server or proxy. Check the connection and proxy address.",
+  "error.https_timeout": "The download server or proxy did not respond in time. Check the connection and retry.",
+  "error.https_cert": "HTTPS certificate verification failed. Check the system clock and trusted certificates before retrying.",
+  "error.https_http": "The download server rejected the request. Check the HTTP status below. For status 404, try another official image selection.",
+  "error.auth_cancelled": "Administrator authentication was cancelled.",
+  "error.auth_unavailable": "Administrator authentication could not be completed. Check the original error below.",
+  "prepare.desktop_after": "A desktop is optional. After recovery, sign in with the new administrator account and follow the setup instructions on the console to install one.",
+  "error.download_space": "The download disk is low on space. Choose a folder on a disk with more free space.",
+  "error.download_checksum": "The image checksum did not match. The temporary download was deleted. Download the image again.",
+  "error.download_temp": "Could not create the temporary download file. Check that the folder is writable and has space.",
+  "error.download_write": "Could not write the download. Check available space and whether the disk is still connected."
 }

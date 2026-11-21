@@ -39,9 +39,27 @@ touch /var/lib/ubuntu-reset-firstboot-complete
 # Disable the one-time setup; Before=getty@tty1 orders login after this script exits.
 rm -f /etc/systemd/system/multi-user.target.wants/ubuntu-reset-firstboot.service
 systemctl daemon-reload
+echo 'Initial setup complete. / 首次设置完成。'
+if [[ ! -e /etc/systemd/system/display-manager.service ]]; then
+    # Show an opt-in next step on base images, before getty takes over the console.
+    desktop_command=''
+    if grep -Eq '^ID="?ubuntu"?$' /usr/lib/os-release; then
+        desktop_command='sudo apt update && sudo apt install ubuntu-desktop-minimal'
+    elif grep -Eq '^ID="?debian"?$' /usr/lib/os-release; then
+        desktop_command='sudo apt update && sudo apt install task-gnome-desktop'
+    elif [[ -e /etc/fedora-release ]]; then
+        desktop_command='sudo dnf5 environment install workstation-product-environment'
+    fi
+    if [[ -n $desktop_command ]]; then
+        echo 'Optional desktop setup after signing in / 登录后可选装桌面'
+        printf '  %s\n' "$desktop_command"
+        echo 'After installation succeeds / 安装成功后'
+        echo '  sudo systemctl set-default graphical.target'
+        echo '  sudo reboot'
+    fi
+fi
 if [[ -f /usr/lib/systemd/system/kmsconvt@.service ]]; then
     systemctl --no-block start kmsconvt@tty1.service
 else
     systemctl --no-block start getty@tty1.service
 fi
-echo 'Initial setup complete. / 首次设置完成。'

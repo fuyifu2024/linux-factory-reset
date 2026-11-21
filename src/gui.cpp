@@ -82,7 +82,10 @@ static bool privileged(Args args, bool preview = false, bool show_success = true
     Result result;
     { BusyDialog busy(initial, true); result = command(args, true, -1, true, true, true, 0, [&](const std::string& chunk) { busy.update(chunk); }); }
     if (result.code != 0) {
-        show_text(tr("operation.failed") + "\n\n" + result.text + "\n" + tr("operation.auth_hint"));
+        auto message = tr("operation.failed");
+        if (result.code == 126) message = tr("error.auth_cancelled");
+        if (result.code == 127) message = tr("error.auth_unavailable") + "\n" + tr("operation.auth_hint");
+        show_text(message + "\n\n" + result.text);
         return false;
     }
     if (preview) show_text(tr("operation.preview") + "\n\n" + result.text);
@@ -123,7 +126,9 @@ struct DownloadDialog {
 };
 
 static void automatic_preparation(const json& sources, const std::string& storage) {
-    show_text(sources.at("reason").get<std::string>() + "\n\n" + tr("prepare.download_folder"));
+    auto instructions = sources.at("reason").get<std::string>();
+    if (sources.at("platform") != "raspi-arm64") instructions += "\n\n" + tr("prepare.desktop_after");
+    show_text(instructions + "\n\n" + tr("prepare.download_folder"));
     auto directory = dialog({"--file-selection", "--directory"}); if (directory.empty()) return;
     TempDir temporary(directory); OfficialImage image;
     { BusyDialog busy; image = resolve_recovery(sources.at("distro"), sources.at("version"), sources.at("platform")); }

@@ -32,6 +32,10 @@ test "$#" -eq 5
 test "$4" = --language
 test "$5" = zh
 test "$3" = cancel
+if [ -n "${GUI_AUTH_CODE:-}" ]; then
+    printf '%s\n' 'Original polkit diagnostic' >&2
+    exit "$GUI_AUTH_CODE"
+fi
 printf '\nLFR_STAGE {"stage":"verifying"}\n'
 sleep 1.3
 printf '\nLFR_STAGE {"stage":"<b>untrusted-display-text</b>"}\n'
@@ -47,5 +51,14 @@ grep -q '阶段已用 1 秒' "$fixture/state/progress"
 grep -q '总用时' "$fixture/state/progress"
 if grep -q 'untrusted-display-text' "$fixture/state/progress"; then exit 1; fi
 grep -q 'Fixture backend finished' "$fixture/state/result"
+for code in 126 127; do
+    rm "$fixture/state/selected"
+    runuser -u gui-smoke -- env GUI_FLOW_DIR="$fixture/state" GUI_AUTH_CODE="$code" "$app" gui --language zh
+    grep -q 'Original polkit diagnostic' "$fixture/state/result"
+    case "$code" in
+        126) grep -q '已取消管理员授权' "$fixture/state/result" ;;
+        127) grep -q '未能完成管理员授权' "$fixture/state/result" ;;
+    esac
+done
 test ! -e /var/lib/ubuntu-reset/request
 printf 'Actual GUI rendered stage changes and elapsed-time heartbeats; unknown stage markup was ignored.\n'

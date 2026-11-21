@@ -164,5 +164,18 @@
   "error.storage_ext4": "所选位置不在 ext4 恢复磁盘上。请选择另一块已挂载的 ext4 磁盘；目前不会自动格式化磁盘。",
   "error.storage_readonly": "所选恢复磁盘是只读的，请以可写方式挂载后重试。",
   "error.shared_esp": "不支持共享或 OEM 启动分区；不会删除其他系统或厂商的引导文件。",
-  "error.grub": "需要发行版标准的 GRUB 和 EFI 厂商目录布局。"
+  "error.grub": "需要发行版标准的 GRUB 和 EFI 厂商目录布局。",
+  "error.https": "HTTPS 请求失败。请检查网络连接后重试。",
+  "error.https_dns": "无法解析下载服务器或代理的地址。请检查 DNS 和代理设置。",
+  "error.https_connect": "无法连接下载服务器或代理。请检查网络连接和代理地址。",
+  "error.https_timeout": "下载服务器或代理响应超时。请检查网络连接后重试。",
+  "error.https_cert": "HTTPS 证书验证失败。请检查系统时间和受信任的证书后再重试。",
+  "error.https_http": "下载服务器拒绝了请求。请查看下方 HTTP 状态。若为 404，请试试其他官方镜像选项。",
+  "error.auth_cancelled": "已取消管理员授权。",
+  "error.auth_unavailable": "未能完成管理员授权。请查看下方的原始错误。",
+  "prepare.desktop_after": "桌面环境可选。恢复后，用新管理员账号登录，再按控制台提示安装桌面。",
+  "error.download_space": "下载磁盘空间不足。请选择空闲空间更多的磁盘目录。",
+  "error.download_checksum": "镜像校验值不匹配，下载临时文件已删除。请重新下载镜像。",
+  "error.download_temp": "无法创建下载临时文件。请确认目录可写且有足够空间。",
+  "error.download_write": "无法写入下载数据。请检查空闲空间，并确认磁盘仍连接。"
 }

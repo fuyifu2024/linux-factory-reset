@@ -23,6 +23,8 @@ Ubuntu 26.04 AMD64 completed the real GUI flow, two successive restorations, new
 
 Includes **English, Simplified Chinese, Hindi, Spanish and Arabic**, with automatic detection and a persistent language menu. Example: `linux-factory-reset gui --language es`. Arabic uses right-to-left layout; every language requires `ERASE-ALL-USERS` for deletion. See the [language guide](docs/languages.md).
 
+After recovery from a generic image, sign in with the new administrator and install a desktop if desired. [Desktop setup](docs/desktop-after-reset.md).
+
 ## Install
 
 Choose the package matching your distribution and architecture. Builds cover Debian 12/13 and Ubuntu 24.04 AMD64/ARM64 DEBs, plus Fedora 45 RPMs for both architectures. Standalone binaries need matching runtime libraries. Use the capabilities and evidence of the tag you download.

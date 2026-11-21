@@ -58,7 +58,7 @@ if [ "$mode" = profile ]; then
 fi
 if [ "$distro" = fedora ]; then cp "$package" "$work/recovery/tool.rpm"; else cp "$package" "$work/recovery/tool.deb"; fi
 cp tests/vm-guest.sh tests/vm-observer.sh tests/drive-gui.mjs "$work/recovery/"
-printf 'REC_UUID=%s\nREC_MODE=%s\nREC_DISTRO=%s\nREC_FAULT=%s\nREC_CYCLES=%s\nREC_GUI=%s\n' "$recovery_uuid" "$mode" "$distro" "$fault" "${RESET_CYCLES:-1}" "${GUI_ACCEPTANCE:-no}" >"$work/recovery/lfr-qa.conf"
+printf 'REC_UUID=%s\nREC_MODE=%s\nREC_DISTRO=%s\nREC_FAULT=%s\nREC_CYCLES=%s\nREC_GUI=%s\nREC_DESKTOP=%s\n' "$recovery_uuid" "$mode" "$distro" "$fault" "${RESET_CYCLES:-1}" "${GUI_ACCEPTANCE:-no}" "${DESKTOP_ACCEPTANCE:-no}" >"$work/recovery/lfr-qa.conf"
 umount "$work/recovery"
 losetup --detach "$recovery_loop"; recovery_loop=''
 target_loop=$(losetup --find --show --partscan "$work/target.raw")
@@ -170,6 +170,11 @@ test ! -e "$work/target/root/lfr-private"
 test ! -e "$work/target/opt/lfr-extra/unwanted"
 test ! -e "$work/target/var/lib/ubuntu-reset/request"
 test ! -e "$work/target/etc/initramfs-tools/conf.d/99-lfr-qa-fast"
+if [ "${DESKTOP_ACCEPTANCE:-no}" = yes ]; then
+    grep -Fq 'sudo apt update && sudo apt install ubuntu-desktop-minimal' "$evidence/vm-serial.txt"
+    grep -qx PASS "$work/target/var/lib/lfr-qa-desktop-result"
+    cp "$work/target/var/lib/lfr-qa-desktop-result" "$evidence/desktop-result.txt"
+fi
 else
     grep -q '^lfr_old_user:' "$work/target/etc/passwd"
     grep -qx 'old private data' "$work/target/root/lfr-private"

@@ -23,6 +23,10 @@ on:
         description: Real Zenity and polkit acceptance (Ubuntu AMD64)
         type: boolean
         default: false
+      desktop:
+        description: Install the optional desktop after one successful Ubuntu AMD64 restore
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -56,8 +60,11 @@ jobs:
           fi
       - name: Start actual disposable VM acceptance
         run: |
+          if [ '${{ inputs.desktop }}' = true ]; then
+            test '${{ inputs.distro }}:${{ inputs.arch }}:${{ inputs.fault }}:${{ inputs.cycles }}' = ubuntu:amd64:none:1
+          fi
           mkdir -p evidence
-          nohup sudo env GITHUB_ACTIONS=true SOURCE_ARCH='${{ inputs.arch }}' RESET_CYCLES='${{ inputs.cycles }}' GUI_ACCEPTANCE='${{ inputs.gui && 'yes' || 'no' }}' VM_TIMEOUT_MINUTES=150 bash -c '
+          nohup sudo env GITHUB_ACTIONS=true SOURCE_ARCH='${{ inputs.arch }}' RESET_CYCLES='${{ inputs.cycles }}' GUI_ACCEPTANCE='${{ inputs.gui && 'yes' || 'no' }}' DESKTOP_ACCEPTANCE='${{ inputs.desktop && 'yes' || 'no' }}' VM_TIMEOUT_MINUTES=150 bash -c '
             bash tests/engine-image.sh "$1" "$2"
             echo "$?" > evidence/test-exit
           ' bash '${{ inputs.distro }}' '${{ inputs.fault }}' > evidence/host.txt 2>&1 < /dev/null &

@@ -37,7 +37,7 @@ size_t receive(char* bytes, size_t size, size_t count, void* opaque) noexcept {
         if (t.fd >= 0) {
             size_t off = 0;
             while (off < n) { auto rc = ::write(t.fd, bytes + off, n - off); if (rc < 0 && errno == EINTR) continue;
-                if (rc <= 0) { t.failure = "写入失败，请检查下载磁盘空间"; return 0; } off += static_cast<size_t>(rc); }
+                if (rc <= 0) { t.failure = tr("error.download_write"); return 0; } off += static_cast<size_t>(rc); }
         } else t.metadata.append(bytes, n);
         t.written += n; return n;
     } catch (...) { t.failure = "Cannot receive HTTPS data"; return 0; }
@@ -75,7 +75,20 @@ void request(const std::string& url, Transfer& t, const std::string& proxy) {
     auto code = curl_easy_perform(c);
     if (t.cancelled) throw Cancelled();
     need(t.failure.empty(), t.failure);
-    need(code == CURLE_OK, "HTTPS 下载失败：" + std::string(error[0] ? error.data() : curl_easy_strerror(code)));
+    if (code == CURLE_OK) return;
+
+    const char* key = "error.https";
+    switch (code) {
+        case CURLE_COULDNT_RESOLVE_HOST:
+        case CURLE_COULDNT_RESOLVE_PROXY: key = "error.https_dns"; break;
+        case CURLE_COULDNT_CONNECT: key = "error.https_connect"; break;
+        case CURLE_OPERATION_TIMEDOUT: key = "error.https_timeout"; break;
+        case CURLE_PEER_FAILED_VERIFICATION:
+        case CURLE_SSL_CACERT_BADFILE: key = "error.https_cert"; break;
+        case CURLE_HTTP_RETURNED_ERROR: key = "error.https_http"; break;
+        default: break;
+    }
+    throw Error(tr(key) + "\n" + (error[0] ? error.data() : curl_easy_strerror(code)));
 }
 std::string human(double count) {
     constexpr const char* units[]{"B", "KiB", "MiB", "GiB"}; size_t n = 0;
@@ -162,10 +175,13 @@ OfficialImage resolve_image(const std::string& distro, const std::string& releas
 fs::path download_official(const OfficialImage& image, const fs::path& directory, Progress progress, const std::string& proxy) {
     validate(image); auto folder = fs::canonical(directory); need(fs::is_directory(folder), "Select a download folder");
     auto destination = folder / image.filename; need(!fs::exists(destination) && !fs::is_symlink(destination), "同名文件已存在，请选择其他目录或检查已有镜像。不会覆盖它。");
-    auto free = fs::space(folder).available; need(free > (image.size ? image.size + (256ULL << 20) : (2ULL << 30)), "下载磁盘空间不足");
+    auto free = fs::space(folder).available;
+    if (free <= (image.size ? image.size + (256ULL << 20) : (2ULL << 30))) throw Error(tr("error.download_space"));
     // mkstemp cannot follow existing symlinks; mode 0600; temporary file stays on the same volume.
     auto pattern = (folder / ("." + image.filename + ".part-XXXXXX")).string(); std::vector<char> name(pattern.begin(), pattern.end()); name.push_back(0);
-    int fd = mkstemp(name.data()); need(fd >= 0, "无法创建下载临时文件"); fs::path partial(name.data());
+    int fd = mkstemp(name.data());
+    if (fd < 0) throw Error(tr("error.download_temp"));
+    fs::path partial(name.data());
     try {
         Transfer t; t.fd = fd; t.limit = std::min<uint64_t>(image_limit, free - (256ULL << 20)); t.callback = std::move(progress);
         if (t.callback && !t.callback({0, image.size, 0})) throw Cancelled();
@@ -175,7 +191,7 @@ fs::path download_official(const OfficialImage& image, const fs::path& directory
         auto check_cancel = [&](uint64_t) { if (t.callback && !t.callback({t.written, t.written, 0})) throw Cancelled(); };
         auto hash = image.checksum_algorithm == "sha512" ? sha512(partial, check_cancel) : sha256(partial, check_cancel);
         if (t.callback && !t.callback({t.written, t.written, 0})) throw Cancelled();
-        need(hash == image.checksum, "镜像校验失败，已删除下载临时文件");
+        if (hash != image.checksum) throw Error(tr("error.download_checksum"));
         // Hard-link publication is atomic and refuses to replace an existing destination.
         need(link(partial.c_str(), destination.c_str()) == 0, "无法保存镜像，可能已有同名文件"); fs::remove(partial);
         return destination;
